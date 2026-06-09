@@ -6,12 +6,12 @@ import { useAppContext } from "@/context/AppContext";
 type OcrStatus = "empty" | "waiting" | "loading" | "done";
 
 function getStatus(
-  uploadedImage: File | null,
+  hasImages: boolean,
   isOcrLoading: boolean,
   ocrRawText: string
 ): OcrStatus {
   if (isOcrLoading) return "loading";
-  if (!uploadedImage) return "empty";
+  if (!hasImages) return "empty";
   if (!ocrRawText) return "waiting";
   return "done";
 }
@@ -71,10 +71,10 @@ const STATUS_CONFIG: Record<OcrStatus, { label: string; color: string; icon: Rea
 };
 
 export default function OCREditor() {
-  const { uploadedImage, ocrRawText, editedOcrText, isOcrLoading, setEditedOcrText } =
+  const { uploadedImages, ocrRawText, editedOcrText, isOcrLoading, setEditedOcrText } =
     useAppContext();
 
-  const status = getStatus(uploadedImage, isOcrLoading, ocrRawText);
+  const status = getStatus(uploadedImages.length > 0, isOcrLoading, ocrRawText);
   const { label, color, icon } = STATUS_CONFIG[status];
 
   const isEditable = status === "done" && !isOcrLoading;
