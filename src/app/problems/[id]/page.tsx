@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ProblemWithQuestions } from "@/types/index";
+import AuthUserMenu from "@/components/AuthUserMenu";
 
 const CIRCLE = ["①", "②", "③", "④", "⑤"];
 const TYPE_STYLE: Record<string, string> = {
@@ -95,7 +96,8 @@ export default function ProblemDetailPage() {
             </svg>
           </Link>
           <h1 className="text-base font-bold text-gray-900 truncate flex-1">{problem.title}</h1>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <AuthUserMenu />
             <button onClick={() => setEditing((v) => !v)}
               className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
               {editing ? "취소" : "수정"}

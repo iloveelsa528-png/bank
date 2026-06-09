@@ -9,6 +9,7 @@ import StructuredView from "@/components/StructuredView";
 import AnalysisView from "@/components/AnalysisView";
 import GenerationView from "@/components/GenerationView";
 import SaveModal from "@/components/SaveModal";
+import AuthUserMenu from "@/components/AuthUserMenu";
 import { StructuredResult, AnalysisResult, GenerationResult } from "@/types/index";
 
 function Spinner() {
@@ -272,6 +273,7 @@ function MainContent() {
               </svg>
               문제은행
             </Link>
+            <AuthUserMenu />
             <StepBadge step={1} label="OCR" />
             <div className="w-6 h-px bg-gray-300" />
             <StepBadge step={2} label="구조화" />

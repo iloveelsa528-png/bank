@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Problem } from "@/types/index";
+import AuthUserMenu from "@/components/AuthUserMenu";
 
 const AREAS = ["", "문학", "독서", "문법", "화작", "기타"];
 const GRADES = ["", "고1", "고2", "고3", "중1", "중2", "중3"];
@@ -91,6 +92,7 @@ export default function ProblemsPage() {
             </svg>
             새 문제 추가
           </Link>
+          <AuthUserMenu />
         </div>
       </header>
 
