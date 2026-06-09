@@ -105,7 +105,7 @@ export default function ProblemsPage() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="제목으로 검색..."
-              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </div>
           <div className="min-w-[130px]">
@@ -114,27 +114,27 @@ export default function ProblemsPage() {
               value={school}
               onChange={(e) => setSchool(e.target.value)}
               placeholder="학교명..."
-              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-500 mb-1 block">학년</label>
             <select value={grade} onChange={(e) => setGrade(e.target.value)}
-              className="border border-gray-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500">
               {GRADES.map((g) => <option key={g} value={g}>{g || "전체"}</option>)}
             </select>
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-500 mb-1 block">영역</label>
             <select value={area} onChange={(e) => setArea(e.target.value)}
-              className="border border-gray-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500">
               {AREAS.map((a) => <option key={a} value={a}>{a || "전체"}</option>)}
             </select>
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-500 mb-1 block">난이도</label>
             <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}
-              className="border border-gray-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500">
               {DIFFICULTIES.map((d) => <option key={d} value={d}>{d || "전체"}</option>)}
             </select>
           </div>
