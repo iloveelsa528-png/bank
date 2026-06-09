@@ -270,6 +270,10 @@ export default function PatternRemixPage() {
               </svg>
               패턴 라이브러리
             </Link>
+            <Link href="/pattern-remix/generate"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors">
+              문제 생성
+            </Link>
             <Link href="/source-passages"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-teal-600 bg-teal-50 hover:bg-teal-100 transition-colors">
               지문 등록
