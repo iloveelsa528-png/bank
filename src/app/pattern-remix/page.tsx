@@ -270,6 +270,10 @@ export default function PatternRemixPage() {
               </svg>
               패턴 라이브러리
             </Link>
+            <Link href="/source-passages"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-teal-600 bg-teal-50 hover:bg-teal-100 transition-colors">
+              지문 등록
+            </Link>
             <Link href="/"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
