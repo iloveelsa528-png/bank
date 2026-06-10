@@ -30,6 +30,7 @@ function toPdfData(s: PatternBasedQuestionSet): PdfData {
     patternSetTitle: s.exam_pattern_sets?.title,
     passageTitle: s.source_passages?.title,
     passageText: s.source_passages?.passage_text,
+    passageImageUrls: s.source_passages?.image_urls,
     keyPoints: s.source_passages?.key_points,
     questions: s.generated_questions ?? [],
     createdAt: s.created_at,

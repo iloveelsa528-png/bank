@@ -17,6 +17,7 @@ export interface SourcePassage {
   analysis_summary: string;
   key_points: string;
   candidate_question_points: CandidateQuestionPoint[];
+  image_urls: string[];
   created_at: string;
   updated_at: string;
 }

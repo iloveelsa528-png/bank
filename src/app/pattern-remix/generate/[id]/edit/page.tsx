@@ -130,6 +130,7 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
               patternSetTitle: questionSet.exam_pattern_sets?.title,
               passageTitle: questionSet.source_passages?.title,
               passageText: questionSet.source_passages?.passage_text,
+              passageImageUrls: questionSet.source_passages?.image_urls,
               keyPoints: questionSet.source_passages?.key_points,
               questions: states.filter(s => !s.excluded).map(s => s.q),
               createdAt: questionSet.created_at,

@@ -9,6 +9,7 @@ export interface PdfData {
   area?: string;
   passageTitle?: string;
   passageText?: string;
+  passageImageUrls?: string[];
   keyPoints?: string;
   patternSetTitle?: string;
   questions: PatternBasedQuestion[];
@@ -88,10 +89,22 @@ function questionBlock(q: PatternBasedQuestion, mode: PdfMode): string {
 export function buildHtml(data: PdfData, mode: PdfMode): string {
   const modeLabel = mode === "student" ? "학생용" : mode === "teacher" ? "교사용" : "전체본";
 
-  const passageSection = data.passageText ? `
+  const imagesHtml = (data.passageImageUrls ?? []).length > 0
+    ? `<div style="margin-bottom:16px">
+        <p style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px">원본 이미지</p>
+        <div style="display:flex;flex-wrap:wrap;gap:12px">
+          ${(data.passageImageUrls ?? []).map(url =>
+            `<img src="${url}" style="max-width:100%;max-height:400px;border:1px solid #e5e7eb;border-radius:6px;object-fit:contain" crossorigin="anonymous"/>`
+          ).join("")}
+        </div>
+      </div>`
+    : "";
+
+  const passageSection = (data.passageText || imagesHtml) ? `
     <div style="margin-bottom:24px;padding:16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px">
       <h3 style="font-size:14px;font-weight:700;color:#374151;margin:0 0 10px">[지문] ${data.passageTitle ?? ""}</h3>
-      <p style="font-size:13px;color:#1f2937;line-height:1.8;white-space:pre-wrap;margin:0">${data.passageText}</p>
+      ${imagesHtml}
+      ${data.passageText ? `<p style="font-size:13px;color:#1f2937;line-height:1.8;white-space:pre-wrap;margin:0">${data.passageText}</p>` : ""}
       ${mode === "full" && data.keyPoints ? `<div style="margin-top:12px;padding:10px;background:#fff;border-left:3px solid #6d28d9;border-radius:4px;font-size:12px;color:#374151"><strong>핵심 내용</strong><br/><span style="white-space:pre-wrap">${data.keyPoints}</span></div>` : ""}
     </div>` : "";
 

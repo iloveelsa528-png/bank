@@ -4,6 +4,7 @@ import React, { useState, useCallback } from "react";
 import Link from "next/link";
 import AuthUserMenu from "@/components/AuthUserMenu";
 import { CandidateQuestionPoint } from "@/types/passages";
+import { createBrowserSupabase } from "@/lib/supabase-browser";
 
 const AREAS = ["문학", "독서", "문법", "화작"];
 const SOURCE_TYPES = ["교과서", "문학작품", "독서지문", "학교자료", "직접입력"];
@@ -123,6 +124,28 @@ export default function SourcePassagesPage() {
     if (!passageText.trim()) { setError("지문 내용을 입력하세요."); return; }
     setSaving(true); setError("");
     try {
+      // 이미지가 있으면 Storage에 업로드 후 URL 수집
+      let imageUrls: string[] = [];
+      if (mode === "image" && images.length > 0) {
+        const supabase = createBrowserSupabase();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const uploads = await Promise.all(images.map(async (file, i) => {
+            const ext = file.name.split(".").pop() ?? "jpg";
+            const path = `${user.id}/${Date.now()}_${i}.${ext}`;
+            const { error } = await supabase.storage
+              .from("passage-images")
+              .upload(path, file, { upsert: true });
+            if (error) throw new Error(`이미지 업로드 실패: ${error.message}`);
+            const { data: { publicUrl } } = supabase.storage
+              .from("passage-images")
+              .getPublicUrl(path);
+            return publicUrl;
+          }));
+          imageUrls = uploads;
+        }
+      }
+
       const res = await fetch("/api/source-passages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -133,6 +156,7 @@ export default function SourcePassagesPage() {
           analysis_summary: analysisSummary,
           key_points: keyPoints,
           candidate_question_points: candidatePoints,
+          image_urls: imageUrls,
         }),
       });
       const data = await res.json();

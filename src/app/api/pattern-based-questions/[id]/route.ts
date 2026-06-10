@@ -10,7 +10,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const { data, error } = await supabase
       .from("pattern_based_questions")
-      .select(`*, exam_pattern_sets(title, school_name, grade), source_passages(title, area, passage_text, key_points)`)
+      .select(`*, exam_pattern_sets(title, school_name, grade), source_passages(title, area, passage_text, key_points, image_urls)`)
       .eq("id", id)
       .eq("user_id", user.id)
       .single();

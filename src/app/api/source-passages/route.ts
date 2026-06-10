@@ -30,12 +30,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       title, area, source_type, passage_text, ocr_raw_text,
-      analysis_summary, key_points, candidate_question_points,
+      analysis_summary, key_points, candidate_question_points, image_urls,
     }: {
       title: string; area: string; source_type: string;
       passage_text: string; ocr_raw_text: string;
       analysis_summary: string; key_points: string;
       candidate_question_points: CandidateQuestionPoint[];
+      image_urls: string[];
     } = body;
 
     if (!title?.trim()) {
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
         analysis_summary: analysis_summary ?? "",
         key_points: key_points ?? "",
         candidate_question_points: candidate_question_points ?? [],
+        image_urls: image_urls ?? [],
       })
       .select()
       .single();

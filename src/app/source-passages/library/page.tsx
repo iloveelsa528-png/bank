@@ -161,6 +161,24 @@ export default function PassageLibraryPage() {
                 {/* 상세 */}
                 {expanded === p.id && (
                   <div className="border-t border-gray-100 px-5 py-4 flex flex-col gap-4">
+                    {/* 원본 이미지 */}
+                    {p.image_urls?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 mb-2">원본 이미지 ({p.image_urls.length}장)</p>
+                        <div className="flex flex-wrap gap-3">
+                          {p.image_urls.map((url, i) => (
+                            <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                              <img
+                                src={url}
+                                alt={`지문 이미지 ${i + 1}`}
+                                className="max-h-64 rounded-lg border border-gray-200 object-contain hover:shadow-md transition-shadow cursor-zoom-in"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* 지문 미리보기 */}
                     {p.passage_text && (
                       <div>

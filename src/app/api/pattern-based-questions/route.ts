@@ -13,7 +13,7 @@ export async function GET() {
       .select(`
         *,
         exam_pattern_sets(title, school_name, grade),
-        source_passages(title, area, passage_text, key_points)
+        source_passages(title, area, passage_text, key_points, image_urls)
       `)
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
