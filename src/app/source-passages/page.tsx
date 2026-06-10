@@ -70,6 +70,12 @@ export default function SourcePassagesPage() {
 
   const analysisReady = !!analysisSummary;
 
+  // 제목 자동 채움: 텍스트 첫 줄 (최대 30자)
+  const autoTitle = passageText.trim()
+    ? passageText.trim().split("\n").find(l => l.trim())?.slice(0, 30) ?? "지문"
+    : "";
+  const effectiveTitle = title.trim() || autoTitle;
+
   // OCR 미리보기: 첫 두 줄
   const ocrPreview = passageText
     ? passageText.split("\n").map(l => l.trim()).filter(Boolean).slice(0, 2).join(" ").slice(0, 100)
@@ -102,6 +108,10 @@ export default function SourcePassagesPage() {
       setOcrRaw(text ?? "");
       setPassageText(text ?? "");
       setOcrDone(true);
+      // OCR 완료 후 자동 분석 시작
+      if (text?.trim()) {
+        await runAnalyze(text.trim());
+      }
     } catch (e) {
       alert(e instanceof Error ? e.message : "OCR 실패");
     } finally {
@@ -115,19 +125,17 @@ export default function SourcePassagesPage() {
     setCandidatePoints(data.candidate_question_points ?? []);
   };
 
-  const handleAnalyze = async () => {
-    if (!passageText.trim()) { alert("지문 내용을 입력하세요."); return; }
+  const runAnalyze = async (text: string) => {
     setAnalysisSummary(""); setKeyPoints(""); setCandidatePoints([]);
     setPassageJobId(null); setPassageJobDone(false); setSourceJobId(null);
 
-    if (passageText.length > PASSAGE_SYNC_LIMIT) {
-      // Job 기반 분석 (긴 지문)
+    if (text.length > PASSAGE_SYNC_LIMIT) {
       setAnalyzing(true);
       try {
         const res = await fetch("/api/source-passages/analyze-job", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ passage_text: passageText, area, source_type: sourceType }),
+          body: JSON.stringify({ passage_text: text, area, source_type: sourceType }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "분석 job 생성 실패");
@@ -140,13 +148,12 @@ export default function SourcePassagesPage() {
       return;
     }
 
-    // 동기 분석 (≤3000자)
     setAnalyzing(true);
     try {
       const res = await fetch("/api/source-passages/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passage_text: passageText, area, source_type: sourceType }),
+        body: JSON.stringify({ passage_text: text, area, source_type: sourceType }),
       });
       if (!res.ok) throw new Error((await res.json()).error || "분석 오류");
       applyAnalysisResult(await res.json());
@@ -155,6 +162,11 @@ export default function SourcePassagesPage() {
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  const handleAnalyze = () => {
+    if (!passageText.trim()) { alert("지문 내용을 입력하세요."); return; }
+    runAnalyze(passageText.trim());
   };
 
   const handleJobComplete = (job: Job) => {
@@ -166,7 +178,6 @@ export default function SourcePassagesPage() {
   };
 
   const handleSave = async () => {
-    if (!title.trim()) { setError("제목을 입력하세요."); return; }
     if (!passageText.trim()) { setError("지문 내용을 입력하세요."); return; }
     setSaving(true); setError("");
     try {
@@ -175,7 +186,7 @@ export default function SourcePassagesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title, area, source_type: sourceType,
+          title: effectiveTitle, area, source_type: sourceType,
           passage_text: passageText, ocr_raw_text: ocrRaw,
           analysis_summary: analysisSummary, key_points: keyPoints,
           candidate_question_points: candidatePoints, image_urls: imageUrls,
@@ -200,7 +211,7 @@ export default function SourcePassagesPage() {
     setSavedId(null); setError("");
   };
 
-  const canSave = !!title.trim() && !!passageText.trim() && !savedId;
+  const canSave = !!passageText.trim() && !savedId;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -520,18 +531,18 @@ export default function SourcePassagesPage() {
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg px-6 py-3 z-50">
           <div className="max-w-7xl mx-auto flex items-center gap-3">
             <div className="flex-1 min-w-0">
-              {title.trim()
-                ? <p className="text-sm font-semibold text-gray-800 truncate">「{title}」 저장 준비 완료</p>
-                : <p className="text-sm text-gray-400">제목을 입력하면 저장할 수 있습니다 (오른쪽 패널)</p>
+              <p className="text-sm font-semibold text-gray-800 truncate">「{effectiveTitle}」 저장 준비 완료</p>
+              {analysisReady
+                ? <p className="text-xs text-green-600 mt-0.5">분석 완료 · 출제 요소 {candidatePoints.length}개</p>
+                : <p className="text-xs text-gray-400 mt-0.5">분석 없이도 저장 가능합니다</p>
               }
-              {analysisReady && <p className="text-xs text-green-600 mt-0.5">분석 완료 · 출제 요소 {candidatePoints.length}개</p>}
             </div>
             {error && <p className="text-xs text-red-500 flex-shrink-0">{error}</p>}
             <button
               onClick={handleSave}
-              disabled={saving || !title.trim()}
+              disabled={saving}
               className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex-shrink-0 ${
-                !saving && title.trim()
+                !saving
                   ? "bg-green-600 text-white hover:bg-green-700 shadow-md"
                   : "bg-gray-200 text-gray-400 cursor-not-allowed"
               }`}>
