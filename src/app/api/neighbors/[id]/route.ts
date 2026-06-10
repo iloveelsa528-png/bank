@@ -11,11 +11,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const { action } = await request.json() as { action: "approve" | "reject" };
   const status = action === "approve" ? "approved" : "rejected";
 
-  // 승인 시 내 프로필도 자동 생성
+  // 승인 시 내 프로필도 자동 생성 (email 포함)
   if (action === "approve") {
     await supabase.from("user_profiles").upsert(
-      { id: user.id, display_name: user.email?.split("@")[0] ?? user.id.slice(0, 8) },
-      { onConflict: "id", ignoreDuplicates: true }
+      { id: user.id, display_name: user.email?.split("@")[0] ?? user.id.slice(0, 8), email: user.email ?? null },
+      { onConflict: "id" }
     );
   }
 

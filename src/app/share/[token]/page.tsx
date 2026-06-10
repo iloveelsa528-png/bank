@@ -191,9 +191,9 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
             )}
 
             {showAnswers && q.answer === 0 && q.descriptive_answer && (
-              <div className="mt-3 ml-5 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs font-semibold text-blue-700 mb-1">모범 답안</p>
-                <p className="text-sm text-blue-900 whitespace-pre-wrap">{q.descriptive_answer}</p>
+              <div className="mt-3 ml-5 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-xs font-semibold text-gray-600 mb-1">모범 답안</p>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap">{q.descriptive_answer}</p>
               </div>
             )}
 

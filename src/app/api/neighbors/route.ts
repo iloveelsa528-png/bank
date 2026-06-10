@@ -61,10 +61,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "유효하지 않은 대상입니다." }, { status: 400 });
   }
 
-  // 내 프로필 자동 생성
+  // 내 프로필 자동 생성 (email 포함)
   await supabase.from("user_profiles").upsert(
-    { id: user.id, display_name: user.email?.split("@")[0] ?? user.id.slice(0, 8) },
-    { onConflict: "id", ignoreDuplicates: true }
+    { id: user.id, display_name: user.email?.split("@")[0] ?? user.id.slice(0, 8), email: user.email ?? null },
+    { onConflict: "id" }
   );
 
   const { error } = await supabase.from("neighbor_requests").insert({

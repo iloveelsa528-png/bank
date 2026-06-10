@@ -17,6 +17,8 @@ export default function AuthUserMenu() {
       if (user) {
         setEmail(user.email ?? null);
         setAvatarUrl(user.user_metadata?.avatar_url);
+        // 프로필 자동 동기화 (이메일 검색에 필요)
+        fetch("/api/profile/sync", { method: "POST" }).catch(() => {});
         fetch("/api/neighbors?pending_count=true")
           .then(r => r.json())
           .then(d => setPendingCount(d.count ?? 0))

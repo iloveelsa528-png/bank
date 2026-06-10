@@ -13,6 +13,13 @@ interface NeighborRequest {
   target_profile?: { display_name: string | null } | null;
 }
 
+interface SearchResult {
+  id: string;
+  display_name: string | null;
+  email: string | null;
+  relationship: { reqId: string; status: string; direction: "sent" | "received" } | null;
+}
+
 function displayName(profile: { display_name: string | null } | null | undefined, fallbackId: string) {
   return profile?.display_name ?? fallbackId.slice(0, 8) + "…";
 }
@@ -24,6 +31,13 @@ export default function NeighborsPage() {
   const [myId, setMyId] = useState("");
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
+
+  // 이메일 검색
+  const [searchEmail, setSearchEmail] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
+  const [searchError, setSearchError] = useState("");
+  const [sendingTo, setSendingTo] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const d = await fetch("/api/neighbors").then(r => r.json());
@@ -62,10 +76,44 @@ export default function NeighborsPage() {
     setActing(null);
   }
 
+  async function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (!searchEmail.trim()) return;
+    setSearching(true);
+    setSearchError("");
+    setSearchResults(null);
+    const r = await fetch(`/api/neighbors/search?email=${encodeURIComponent(searchEmail.trim())}`);
+    const d = await r.json();
+    if (!r.ok) { setSearchError(d.error ?? "검색 실패"); }
+    else { setSearchResults(d.results ?? []); }
+    setSearching(false);
+  }
+
+  async function sendRequest(targetId: string) {
+    setSendingTo(targetId);
+    const r = await fetch("/api/neighbors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target_id: targetId }),
+    });
+    const d = await r.json();
+    if (!r.ok) { alert(d.error ?? "오류 발생"); }
+    else {
+      // 검색 결과 즉시 업데이트
+      setSearchResults(prev => prev?.map(p =>
+        p.id === targetId
+          ? { ...p, relationship: { reqId: "", status: "pending", direction: "sent" } }
+          : p
+      ) ?? null);
+      await load();
+    }
+    setSendingTo(null);
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-purple-300 border-t-purple-600 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-green-200 border-t-green-600 rounded-full animate-spin" />
       </div>
     );
   }
@@ -74,34 +122,85 @@ export default function NeighborsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <header className="bg-white border-b px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+        <div className="flex items-center gap-3">
           <Link href="/" className="text-gray-400 hover:text-gray-600 text-sm">← 홈</Link>
-          <h1 className="text-xl font-bold text-gray-900">서로이웃 관리</h1>
+          <h1 className="text-base font-bold text-gray-900">서로이웃 관리</h1>
         </div>
         <AuthUserMenu />
       </header>
 
-      <main className="max-w-2xl mx-auto p-6 space-y-6">
-        {/* 내 프로필 링크 */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">내 프로필 링크</h2>
-          <p className="text-xs text-gray-500 mb-3">
-            이 링크를 상대방에게 공유하면, 상대방이 서로이웃 신청을 보낼 수 있습니다.
-          </p>
-          <div className="flex gap-2">
+      <main className="max-w-lg mx-auto px-4 py-5 space-y-4">
+
+        {/* 이메일로 이웃 찾기 */}
+        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h2 className="text-sm font-bold text-gray-800 mb-1">이메일로 이웃 찾기</h2>
+          <p className="text-xs text-gray-500 mb-3">상대방 이메일 주소로 검색하여 이웃 신청을 보낼 수 있습니다.</p>
+          <form onSubmit={handleSearch} className="flex gap-2">
             <input
-              readOnly
-              value={profileUrl}
-              className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-600 truncate"
+              type="email"
+              value={searchEmail}
+              onChange={e => setSearchEmail(e.target.value)}
+              placeholder="example@gmail.com"
+              className="flex-1 text-sm border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
             />
             <button
-              onClick={() => { navigator.clipboard.writeText(profileUrl); }}
-              className="shrink-0 text-xs px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium"
+              type="submit"
+              disabled={searching || !searchEmail.trim()}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 shrink-0"
             >
-              복사
+              {searching ? "검색 중…" : "검색"}
             </button>
-          </div>
+          </form>
+
+          {/* 검색 결과 */}
+          {searchError && (
+            <p className="text-xs text-red-500 mt-2">{searchError}</p>
+          )}
+          {searchResults !== null && (
+            <div className="mt-3 flex flex-col gap-2">
+              {searchResults.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-3">검색 결과가 없습니다. 상대방이 아직 앱을 사용하지 않았거나 이메일이 다를 수 있습니다.</p>
+              ) : (
+                searchResults.map(result => {
+                  const rel = result.relationship;
+                  const isNeighbor = rel?.status === "approved";
+                  const isPendingSent = rel?.status === "pending" && rel?.direction === "sent";
+                  const isPendingReceived = rel?.status === "pending" && rel?.direction === "received";
+                  return (
+                    <div key={result.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
+                        {(result.display_name ?? result.email ?? "?").charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {result.display_name ?? "이름 없음"}
+                        </p>
+                        <p className="text-xs text-gray-400 truncate">{result.email}</p>
+                      </div>
+                      <div className="shrink-0">
+                        {isNeighbor ? (
+                          <span className="text-xs text-green-600 font-medium">이웃 ✓</span>
+                        ) : isPendingSent ? (
+                          <span className="text-xs text-gray-400">신청 중…</span>
+                        ) : isPendingReceived ? (
+                          <span className="text-xs text-orange-500">신청 받음</span>
+                        ) : (
+                          <button
+                            onClick={() => sendRequest(result.id)}
+                            disabled={sendingTo === result.id}
+                            className="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition font-medium"
+                          >
+                            {sendingTo === result.id ? "신청 중…" : "신청"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </section>
 
         {/* 받은 신청 */}
@@ -134,7 +233,7 @@ export default function NeighborsPage() {
                     <button
                       onClick={() => respond(r.id, "approve")}
                       disabled={acting === r.id}
-                      className="text-xs px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-40 transition font-medium"
+                      className="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 transition font-medium"
                     >
                       {acting === r.id ? "처리 중…" : "수락"}
                     </button>
@@ -174,7 +273,7 @@ export default function NeighborsPage() {
                       </p>
                       <Link
                         href={`/profile/${neighborId}`}
-                        className="text-xs text-purple-600 hover:underline"
+                        className="text-xs text-green-600 hover:underline"
                       >
                         프로필 보기
                       </Link>
@@ -218,6 +317,26 @@ export default function NeighborsPage() {
             </div>
           </section>
         )}
+
+        {/* 내 프로필 링크 (기존 방법) */}
+        <section className="bg-gray-50 rounded-2xl border border-gray-200 p-4">
+          <h2 className="text-xs font-semibold text-gray-500 mb-1">내 프로필 링크로 공유</h2>
+          <p className="text-xs text-gray-400 mb-2">이 링크를 상대방에게 보내면 상대방이 직접 신청할 수도 있습니다.</p>
+          <div className="flex gap-2">
+            <input
+              readOnly
+              value={profileUrl}
+              className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-500 truncate"
+            />
+            <button
+              onClick={() => { navigator.clipboard.writeText(profileUrl); }}
+              className="shrink-0 text-xs px-3 py-1.5 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition font-medium"
+            >
+              복사
+            </button>
+          </div>
+        </section>
+
       </main>
     </div>
   );
