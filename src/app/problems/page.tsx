@@ -76,7 +76,7 @@ export default function ProblemsPage() {
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-3">
-          <Link href="/" className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
+          <Link href="/" className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center flex-shrink-0">
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
@@ -105,7 +105,7 @@ export default function ProblemsPage() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="제목으로 검색..."
-              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
             />
           </div>
           <div className="min-w-[130px]">
@@ -114,7 +114,7 @@ export default function ProblemsPage() {
               value={school}
               onChange={(e) => setSchool(e.target.value)}
               placeholder="학교명..."
-              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
             />
           </div>
           <div>
@@ -156,7 +156,7 @@ export default function ProblemsPage() {
               </svg>
             </div>
             <p className="text-sm text-gray-500">저장된 문제가 없습니다.</p>
-            <Link href="/" className="text-sm text-blue-600 hover:underline">새 문제 추가하기</Link>
+            <Link href="/" className="text-sm text-green-600 hover:underline">새 문제 추가하기</Link>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -186,7 +186,7 @@ export default function ProblemsPage() {
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Link href={`/problems/${p.id}`}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors">
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 transition-colors">
                     상세 보기
                   </Link>
                   <button

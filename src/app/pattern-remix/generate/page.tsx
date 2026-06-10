@@ -1,6 +1,7 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ExamPatternSet } from "@/types/patterns";
 import { SourcePassage } from "@/types/passages";
 import { PatternBasedQuestion } from "@/types/pattern-remix";
@@ -241,8 +242,8 @@ function QuestionCard({
       {/* 읽기 전용 펼침 (편집 모드가 아닐 때) */}
       {!eq.excluded && !eq.editing && q.choices.length > 0 && (
         <div className="border-t bg-gray-50/60 p-3 space-y-1.5">
-          {q.choices.map(c => (
-            <div key={c.number} className={`flex gap-2 text-sm p-1.5 rounded ${c.is_correct ? "bg-green-50 text-green-800" : "text-gray-700"}`}>
+          {q.choices.map((c, ci) => (
+            <div key={ci} className={`flex gap-2 text-sm p-1.5 rounded ${c.is_correct ? "bg-green-50 text-green-800" : "text-gray-700"}`}>
               <span className="font-medium shrink-0">{c.number}.</span>
               <span className="line-clamp-1">{c.text}</span>
             </div>
@@ -253,9 +254,12 @@ function QuestionCard({
   );
 }
 
-export default function GeneratePage() {
+function GeneratePageInner() {
+  const searchParams = useSearchParams();
   const [patternSets, setPatternSets] = useState<ExamPatternSet[]>([]);
   const [passages, setPassages] = useState<SourcePassage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [selectedPattern, setSelectedPattern] = useState<ExamPatternSet | null>(null);
   const [selectedPassage, setSelectedPassage] = useState<SourcePassage | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -266,12 +270,38 @@ export default function GeneratePage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const prePattern = searchParams.get("pattern");
+    const prePassage = searchParams.get("passage");
+
     Promise.all([
-      fetch("/api/pattern-sets").then(r => r.json()),
-      fetch("/api/source-passages").then(r => r.json()),
+      fetch("/api/pattern-sets").then(async r => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error ?? "패턴 세트 로드 실패");
+        return data;
+      }),
+      fetch("/api/source-passages").then(async r => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error ?? "지문 로드 실패");
+        return data;
+      }),
     ]).then(([ps, sp]) => {
-      setPatternSets(ps.patternSets ?? []);
-      setPassages(sp.passages ?? []);
+      const loadedPatterns: ExamPatternSet[] = ps.patternSets ?? [];
+      const loadedPassages: SourcePassage[] = sp.passages ?? [];
+      setPatternSets(loadedPatterns);
+      setPassages(loadedPassages);
+      // URL 파라미터로 사전 선택
+      if (prePattern) {
+        const found = loadedPatterns.find(p => p.id === prePattern);
+        if (found) setSelectedPattern(found);
+      }
+      if (prePassage) {
+        const found = loadedPassages.find(p => p.id === prePassage);
+        if (found) setSelectedPassage(found);
+      }
+    }).catch(e => {
+      setLoadError(e instanceof Error ? e.message : "데이터를 불러오지 못했습니다. 새로고침해 주세요.");
+    }).finally(() => {
+      setLoading(false);
     });
   }, []);
 
@@ -344,6 +374,7 @@ export default function GeneratePage() {
 
   const adopted = editables.filter(e => !e.excluded).length;
   const reviewed = editables.filter(e => e.reviewed && !e.excluded).length;
+  const selectedPassageHasText = !!selectedPassage?.passage_text?.trim();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -357,15 +388,21 @@ export default function GeneratePage() {
         </Link>
       </header>
 
+      {loadError && (
+        <div className="m-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{loadError}</div>
+      )}
+
       <div className="flex h-[calc(100vh-64px)]">
         {/* Col 1: 패턴 세트 선택 */}
         <div className="w-[26%] border-r bg-white flex flex-col">
           <div className="p-4 border-b bg-purple-50">
             <h2 className="font-semibold text-purple-800 text-sm">① 기출 패턴 세트 선택</h2>
-            <p className="text-xs text-gray-500 mt-0.5">{patternSets.length}개 저장됨</p>
+            <p className="text-xs text-gray-500 mt-0.5">{loading ? "불러오는 중…" : `${patternSets.length}개 저장됨`}</p>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {patternSets.length === 0 ? (
+            {loading ? (
+              <div className="flex justify-center pt-12"><div className="w-5 h-5 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin" /></div>
+            ) : patternSets.length === 0 ? (
               <div className="text-center text-gray-400 text-sm pt-12">
                 <p>저장된 패턴 세트 없음</p>
                 <Link href="/pattern-remix" className="text-purple-600 hover:underline text-xs mt-2 block">패턴 추출하러 가기</Link>
@@ -390,15 +427,19 @@ export default function GeneratePage() {
         <div className="w-[26%] border-r bg-white flex flex-col">
           <div className="p-4 border-b bg-teal-50">
             <h2 className="font-semibold text-teal-800 text-sm">② 새 지문 선택</h2>
-            <p className="text-xs text-gray-500 mt-0.5">{passages.length}개 저장됨</p>
+            <p className="text-xs text-gray-500 mt-0.5">{loading ? "불러오는 중…" : `${passages.length}개 저장됨`}</p>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {passages.length === 0 ? (
+            {loading ? (
+              <div className="flex justify-center pt-12"><div className="w-5 h-5 border-2 border-teal-300 border-t-teal-600 rounded-full animate-spin" /></div>
+            ) : passages.length === 0 ? (
               <div className="text-center text-gray-400 text-sm pt-12">
                 <p>저장된 지문 없음</p>
                 <Link href="/source-passages" className="text-teal-600 hover:underline text-xs mt-2 block">지문 등록하러 가기</Link>
               </div>
-            ) : passages.map(p => (
+            ) : passages.map(p => {
+              const hasText = !!p.passage_text?.trim();
+              return (
               <button
                 key={p.id}
                 onClick={() => setSelectedPassage(p)}
@@ -408,11 +449,16 @@ export default function GeneratePage() {
               >
                 <p className="font-medium text-gray-900 leading-tight">{p.title}</p>
                 <p className="text-xs text-gray-500 mt-1">{p.area} · {p.source_type}</p>
-                <p className="text-xs text-teal-600 mt-1 line-clamp-2">
-                  {p.analysis_summary?.slice(0, 80)}{(p.analysis_summary?.length ?? 0) > 80 ? "…" : ""}
-                </p>
+                {!hasText && (
+                  <p className="text-xs text-orange-500 mt-1">⚠ 지문 텍스트 없음 — 문제 생성 불가</p>
+                )}
+                {hasText && (
+                  <p className="text-xs text-teal-600 mt-1 line-clamp-2">
+                    {p.analysis_summary?.slice(0, 80)}{(p.analysis_summary?.length ?? 0) > 80 ? "…" : ""}
+                  </p>
+                )}
               </button>
-            ))}
+            )})}
           </div>
         </div>
 
@@ -429,7 +475,7 @@ export default function GeneratePage() {
             </div>
             <button
               onClick={generate}
-              disabled={generating || !selectedPattern || !selectedPassage}
+              disabled={generating || !selectedPattern || !selectedPassage || !selectedPassageHasText}
               className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg font-medium hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
               {generating ? "생성 중…" : editables.length > 0 ? "재생성" : "문제 생성"}
@@ -437,9 +483,12 @@ export default function GeneratePage() {
           </div>
 
           {/* 선택 요약 */}
-          <div className="px-4 py-2 border-b bg-gray-50/50 flex gap-4 text-xs text-gray-600">
+          <div className="px-4 py-2 border-b bg-gray-50/50 flex gap-4 text-xs text-gray-600 flex-wrap">
             <span>패턴: <span className="font-medium text-purple-700">{selectedPattern?.title ?? "미선택"}</span></span>
             <span>지문: <span className="font-medium text-teal-700">{selectedPassage?.title ?? "미선택"}</span></span>
+            {selectedPassage && !selectedPassageHasText && (
+              <span className="text-orange-600 font-medium">⚠ 선택한 지문에 텍스트가 없습니다. 지문 편집에서 텍스트를 입력해주세요.</span>
+            )}
           </div>
 
           {error && (
@@ -485,28 +534,8 @@ export default function GeneratePage() {
               </>
             )}
 
-            {/* 저장 폼 */}
-            {editables.length > 0 && !savedId && (
-              <div className="border-t pt-4">
-                <p className="text-sm font-semibold text-gray-700 mb-1">문제 세트 저장</p>
-                <p className="text-xs text-gray-500 mb-2">제외된 문항 {editables.filter(e => e.excluded).length}개는 저장에서 제외됩니다.</p>
-                <div className="flex gap-2">
-                  <input
-                    value={saveTitle}
-                    onChange={e => setSaveTitle(e.target.value)}
-                    placeholder="문제 세트 제목"
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
-                  />
-                  <button
-                    onClick={save}
-                    disabled={saving}
-                    className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-40 transition font-medium"
-                  >
-                    {saving ? "저장 중…" : "저장"}
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* 저장 완료 후 공간 확보 */}
+            {editables.length > 0 && !savedId && <div className="h-20" />}
 
             {savedId && (
               <div className="border border-green-300 bg-green-50 rounded-lg p-4 text-center">
@@ -536,6 +565,42 @@ export default function GeneratePage() {
           </div>
         </div>
       </div>
+
+      {/* Sticky 저장 바 — 문제 생성 후 항상 하단에 표시 */}
+      {editables.length > 0 && !savedId && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50 px-6 py-3">
+          <div className="flex items-center gap-3 max-w-7xl mx-auto">
+            <div className="flex-shrink-0 text-xs text-gray-500">
+              채택 <span className="font-semibold text-purple-700">{adopted}</span>/{editables.length}문항
+              {editables.filter(e => e.excluded).length > 0 && (
+                <span className="text-gray-400"> · 제외 {editables.filter(e => e.excluded).length}개</span>
+              )}
+            </div>
+            <input
+              value={saveTitle}
+              onChange={e => setSaveTitle(e.target.value)}
+              placeholder="문제 세트 제목 입력 후 저장"
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+            />
+            {error && <p className="text-xs text-red-500 flex-shrink-0">{error}</p>}
+            <button
+              onClick={save}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-5 py-2.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-40 transition font-bold flex-shrink-0 shadow-md"
+            >
+              {saving ? "저장 중…" : "저장"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function GeneratePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><svg className="w-8 h-8 animate-spin text-purple-500" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>}>
+      <GeneratePageInner />
+    </Suspense>
   );
 }

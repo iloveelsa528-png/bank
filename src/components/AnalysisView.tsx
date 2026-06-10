@@ -43,7 +43,7 @@ function QuestionCard({ qa, index }: { qa: QuestionAnalysis; index: number }) {
         className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <span className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+          <span className="w-7 h-7 rounded-full bg-green-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
             {qa.questionNumber}
           </span>
           <span className="text-sm font-semibold text-gray-800">
@@ -83,9 +83,9 @@ function QuestionCard({ qa, index }: { qa: QuestionAnalysis; index: number }) {
           {qa.choiceAnalysis.length > 0 && (
             <div className="flex flex-col gap-2">
               <SectionLabel>선택지 분석</SectionLabel>
-              {qa.choiceAnalysis.map((c) => (
+              {qa.choiceAnalysis.map((c, ci) => (
                 <div
-                  key={c.number}
+                  key={ci}
                   className={`rounded-xl border p-3 flex flex-col gap-1 ${
                     c.isCorrect
                       ? "bg-green-50 border-green-200"
@@ -163,8 +163,8 @@ export default function AnalysisView() {
                 <p className="text-xs font-semibold text-gray-700 mb-1">
                   {q.questionNumber}번. {q.questionText}
                 </p>
-                {q.choices.map((c) => (
-                  <p key={c.number} className="text-xs text-gray-500">
+                {q.choices.map((c, ci) => (
+                  <p key={ci} className="text-xs text-gray-500">
                     {["①", "②", "③", "④", "⑤"][c.number - 1]} {c.text}
                   </p>
                 ))}

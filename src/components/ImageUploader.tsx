@@ -128,7 +128,7 @@ export default function ImageUploader() {
           </div>
 
           <div className="text-center px-4">
-            <p className={`text-base font-medium ${isDragging ? "text-blue-600" : "text-gray-600"}`}>
+            <p className={`text-base font-medium ${isDragging ? "text-green-600" : "text-gray-600"}`}>
               {isDragging ? "여기에 놓으세요!" : "이미지를 드래그하거나 클릭하여 업로드"}
             </p>
             <p className="text-sm text-gray-400 mt-1">JPG, PNG, WEBP 지원 · 여러 장 동시 선택 가능</p>
@@ -149,7 +149,7 @@ export default function ImageUploader() {
           >
             {isDragging && (
               <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                <p className="text-blue-600 font-semibold text-base bg-white/80 px-4 py-2 rounded-lg shadow">
+                <p className="text-green-600 font-semibold text-base bg-white/80 px-4 py-2 rounded-lg shadow">
                   여기에 놓으세요!
                 </p>
               </div>
@@ -198,7 +198,7 @@ export default function ImageUploader() {
               {/* 파일 추가 버튼 */}
               <button
                 onClick={handleClickUpload}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-green-200 rounded-lg hover:bg-green-100 hover:border-green-300 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

@@ -34,11 +34,13 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
   const { id } = use(params);
   const [questionSet, setQuestionSet] = useState<PatternBasedQuestionSet | null>(null);
   const [title, setTitle] = useState("");
+  const [visibility, setVisibility] = useState<'private' | 'link_only' | 'neighbors' | 'public'>('private');
   const [states, setStates] = useState<EditState[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetch(`/api/pattern-based-questions/${id}`)
@@ -47,6 +49,7 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
         const qs: PatternBasedQuestionSet = d.questionSet;
         setQuestionSet(qs);
         setTitle(qs.title);
+        setVisibility(qs.visibility ?? 'private');
         setStates((qs.generated_questions ?? []).map((q: PatternBasedQuestion) => ({
           q, excluded: false, reviewed: false, editing: false,
         })));
@@ -81,7 +84,7 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
       const res = await fetch(`/api/pattern-based-questions/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, generated_questions: finalQuestions }),
+        body: JSON.stringify({ title, generated_questions: finalQuestions, visibility }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -161,6 +164,50 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
           <div className="flex gap-4 text-xs text-gray-500">
             <span>패턴: <span className="font-medium text-purple-700">{questionSet.exam_pattern_sets?.title ?? "-"}</span></span>
             <span>지문: <span className="font-medium text-teal-700">{questionSet.source_passages?.title ?? "-"}</span></span>
+          </div>
+          {/* 공개 범위 */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">공개 범위</label>
+            <div className="flex gap-2 flex-wrap">
+              {([
+                { value: 'private', label: '🔒 비공개', desc: '나만 볼 수 있음' },
+                { value: 'link_only', label: '🔗 링크 공유', desc: '링크가 있으면 접근 가능' },
+                { value: 'neighbors', label: '👥 서로이웃', desc: '승인된 서로이웃만 열람 가능' },
+                { value: 'public', label: '🌍 전체 공개', desc: '모든 사용자 탐색 가능' },
+              ] as const).map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => { setVisibility(opt.value); setSaved(false); }}
+                  title={opt.desc}
+                  className={`text-xs px-3 py-1.5 rounded-lg border transition ${
+                    visibility === opt.value
+                      ? 'border-purple-500 bg-purple-50 text-purple-700 font-medium'
+                      : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {(visibility === 'link_only' || visibility === 'public') && questionSet?.share_token && (
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  readOnly
+                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/share/${questionSet.share_token}`}
+                  className="flex-1 text-xs border border-gray-200 rounded px-2 py-1.5 bg-gray-50 text-gray-500 truncate"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/share/${questionSet.share_token}`);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className="shrink-0 text-xs px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded border border-gray-200 transition"
+                >
+                  {copied ? '복사됨 ✓' : '링크 복사'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -344,8 +391,8 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
               {/* 읽기 전용 선택지 미리보기 */}
               {!s.excluded && !s.editing && q.choices.length > 0 && (
                 <div className="border-t bg-gray-50/60 p-3 space-y-1">
-                  {q.choices.map(c => (
-                    <div key={c.number} className={`flex gap-2 text-sm px-2 py-1.5 rounded ${c.is_correct ? "bg-green-50 text-green-800 font-medium" : "text-gray-700"}`}>
+                  {q.choices.map((c, ci) => (
+                    <div key={ci} className={`flex gap-2 text-sm px-2 py-1.5 rounded ${c.is_correct ? "bg-green-50 text-green-800 font-medium" : "text-gray-700"}`}>
                       <span className="shrink-0">{c.number}.</span>
                       <span className="line-clamp-1">{c.text}</span>
                     </div>

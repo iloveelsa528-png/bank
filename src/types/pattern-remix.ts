@@ -30,6 +30,8 @@ export interface PatternBasedQuestionSet {
   area: string;
   created_at: string;
   updated_at: string;
+  visibility: 'private' | 'link_only' | 'neighbors' | 'public';
+  share_token: string;
   // joins
   exam_pattern_sets?: { title: string; school_name: string; grade: string };
   source_passages?: { title: string; area: string; passage_text?: string; key_points?: string; image_urls?: string[] };

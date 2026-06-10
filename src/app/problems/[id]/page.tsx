@@ -78,7 +78,7 @@ export default function ProblemDetailPage() {
   if (!problem) return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-3">
       <p className="text-gray-500">문제를 찾을 수 없습니다.</p>
-      <Link href="/problems" className="text-blue-600 hover:underline text-sm">목록으로</Link>
+      <Link href="/problems" className="text-green-600 hover:underline text-sm">목록으로</Link>
     </div>
   );
 
@@ -135,7 +135,7 @@ export default function ProblemDetailPage() {
               ))}
               <div className="col-span-2 flex justify-end">
                 <button onClick={handleSave} disabled={saving}
-                  className="px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                  className="px-4 py-2 rounded-xl text-sm font-semibold bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
                   {saving ? "저장 중..." : "저장"}
                 </button>
               </div>
@@ -184,8 +184,8 @@ export default function ProblemDetailPage() {
             {problem.structured_data.questions?.map((q) => (
               <div key={q.id} className="border-t border-gray-100 pt-3 mt-3">
                 <p className="text-sm font-medium text-gray-800 mb-2">{q.questionNumber}. {q.questionText}</p>
-                {q.choices.map((c) => (
-                  <p key={c.number} className="text-xs text-gray-600 ml-2">
+                {q.choices.map((c, ci) => (
+                  <p key={ci} className="text-xs text-gray-600 ml-2">
                     {CIRCLE[c.number - 1]} {c.text}
                   </p>
                 ))}
@@ -212,8 +212,8 @@ export default function ProblemDetailPage() {
                   {q.answer > 0 && <span className="text-xs font-semibold text-gray-600">정답: {CIRCLE[q.answer - 1]}</span>}
                 </div>
                 <p className="text-sm text-gray-800 mb-2">{q.question_text}</p>
-                {q.choices?.map((c: { number: number; text: string }) => (
-                  <p key={c.number} className="text-xs text-gray-600 ml-2">
+                {q.choices?.map((c: { number: number; text: string }, ci: number) => (
+                  <p key={ci} className="text-xs text-gray-600 ml-2">
                     {CIRCLE[c.number - 1]} {c.text}
                   </p>
                 ))}

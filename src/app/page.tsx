@@ -1,515 +1,225 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { AppProvider, useAppContext } from "@/context/AppContext";
-import ImageUploader from "@/components/ImageUploader";
-import OCREditor from "@/components/OCREditor";
-import StructuredView from "@/components/StructuredView";
-import AnalysisView from "@/components/AnalysisView";
-import GenerationView from "@/components/GenerationView";
-import SaveModal from "@/components/SaveModal";
 import AuthUserMenu from "@/components/AuthUserMenu";
-import { StructuredResult, AnalysisResult, GenerationResult } from "@/types/index";
 
-function Spinner() {
-  return (
-    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-    </svg>
-  );
+interface Stats {
+  patternSets: number;
+  passages: number;
+  questionSets: number;
 }
 
-function MainContent() {
-  const {
-    uploadedImages,
-    ocrRawText,
-    editedOcrText,
-    isOcrLoading,
-    isOcrComplete,
-    currentStep,
-    structuredResult,
-    structuredResults,
-    selectedGroupIndex,
-    isStructureLoading,
-    isStructureComplete,
-    analysisResult,
-    isAnalysisLoading,
-    isAnalysisComplete,
-    generationResult,
-    isGenerationLoading,
-    isGenerationComplete,
-    setOcrRawText,
-    setEditedOcrText,
-    setIsOcrLoading,
-    setIsOcrComplete,
-    setCurrentStep,
-    setStructuredResult,
-    setStructuredResults,
-    setSelectedGroupIndex,
-    setIsStructureLoading,
-    setIsStructureComplete,
-    setAnalysisResult,
-    setIsAnalysisLoading,
-    setIsAnalysisComplete,
-    setGenerationResult,
-    setIsGenerationLoading,
-    setIsGenerationComplete,
-  } = useAppContext();
+const QUICK_ACTIONS = [
+  {
+    href: "/pattern-remix",
+    label: "기출 분석",
+    sub: "시험지 OCR + 패턴 추출",
+    icon: (
+      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+      </svg>
+    ),
+    color: "bg-green-50 border-green-100",
+  },
+  {
+    href: "/source-passages",
+    label: "지문 등록",
+    sub: "새 지문 입력 / OCR",
+    icon: (
+      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+      </svg>
+    ),
+    color: "bg-green-50 border-green-100",
+  },
+  {
+    href: "/pattern-remix/generate",
+    label: "문제 생성",
+    sub: "패턴 × 지문 → AI 문제",
+    icon: (
+      <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    ),
+    color: "bg-purple-50 border-purple-100",
+  },
+  {
+    href: "/explore",
+    label: "자료 탐색",
+    sub: "공유 문제 세트 검색",
+    icon: (
+      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    ),
+    color: "bg-green-50 border-green-100",
+  },
+];
 
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [savedId, setSavedId] = useState<string | null>(null);
+const LIBRARY_LINKS = [
+  { href: "/pattern-remix/library", label: "패턴 라이브러리", sub: "저장된 기출 패턴 목록" },
+  { href: "/source-passages/library", label: "지문 라이브러리", sub: "등록된 지문 목록" },
+  { href: "/pattern-remix/generate/library", label: "생성된 문제 목록", sub: "편집·공유·PDF" },
+];
 
-  const canRunOcr = uploadedImages.length > 0 && !isOcrLoading;
-  const canComplete = editedOcrText.trim().length > 0 && !isOcrLoading;
-  const canGoToStep2 = isOcrComplete;
-  const canGoToStep3 = isStructureComplete;
-  const canGoToStep4 = isAnalysisComplete;
-  const canStructure = !isStructureLoading;
-  const canFinishStructure = !!structuredResult && selectedGroupIndex >= 0 && !isStructureLoading;
-  const canAnalyze = !!structuredResult && !isAnalysisLoading;
-  const canFinishAnalysis = !!analysisResult && !isAnalysisLoading;
-  const canGenerate = !!structuredResult && !!analysisResult && !isGenerationLoading;
-  const canFinishGeneration = !!generationResult && !isGenerationLoading;
+export default function Home() {
+  const [stats, setStats] = useState<Stats | null>(null);
 
-  // ── OCR 실행 ────────────────────────────────────────────────────────────
-  const handleOcrRun = async () => {
-    if (uploadedImages.length === 0) return;
-    setIsOcrLoading(true);
-    setIsOcrComplete(false);
-    try {
-      const formData = new FormData();
-      uploadedImages.forEach((file, i) => formData.append(`image_${i}`, file));
-      formData.append("imageCount", String(uploadedImages.length));
-      const res = await fetch("/api/ocr", { method: "POST", body: formData });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `오류 ${res.status}`);
-      const { text = "" } = await res.json();
-      setOcrRawText(text);
-      setEditedOcrText(text);
-    } catch (err) {
-      alert(`OCR 오류:\n${err instanceof Error ? err.message : "알 수 없는 오류"}`);
-    } finally {
-      setIsOcrLoading(false);
-    }
-  };
-
-  // ── 1→2단계 ─────────────────────────────────────────────────────────────
-  const handleComplete = () => {
-    if (!canComplete) return;
-    setIsOcrComplete(true);
-    setCurrentStep(2);
-  };
-
-  // ── 구조화 분석 ──────────────────────────────────────────────────────────
-  const handleStructureAnalysis = async () => {
-    if (!canStructure) return;
-    setIsStructureLoading(true);
-    setIsStructureComplete(false);
-    try {
-      const res = await fetch("/api/structure", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: editedOcrText }),
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/pattern-sets").then(r => r.json()).catch(() => ({})),
+      fetch("/api/source-passages").then(r => r.json()).catch(() => ({})),
+      fetch("/api/pattern-based-questions").then(r => r.json()).catch(() => ({})),
+    ]).then(([ps, sp, pq]) => {
+      setStats({
+        patternSets:  (ps.patternSets  ?? []).length,
+        passages:     (sp.passages     ?? []).length,
+        questionSets: (pq.questionSets ?? []).length,
       });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `오류 ${res.status}`);
-      const { results = [] }: { results: StructuredResult[] } = await res.json();
-      setStructuredResults(results);
-      setSelectedGroupIndex(results.length === 1 ? 0 : -1);
-      setStructuredResult(results.length === 1 ? results[0] : null);
-    } catch (err) {
-      alert(`구조화 분석 오류:\n${err instanceof Error ? err.message : "알 수 없는 오류"}`);
-    } finally {
-      setIsStructureLoading(false);
-    }
-  };
-
-  // ── 2→3단계 ─────────────────────────────────────────────────────────────
-  const handleStructureComplete = () => {
-    if (!canFinishStructure) return;
-    setIsStructureComplete(true);
-    setCurrentStep(3);
-  };
-
-  // ── 문항 분석 ────────────────────────────────────────────────────────────
-  const handleAnalysis = async () => {
-    if (!canAnalyze || !structuredResult) return;
-    setIsAnalysisLoading(true);
-    setIsAnalysisComplete(false);
-    try {
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ structured: structuredResult }),
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `오류 ${res.status}`);
-      const { result }: { result: AnalysisResult } = await res.json();
-      setAnalysisResult(result);
-    } catch (err) {
-      alert(`문항 분석 오류:\n${err instanceof Error ? err.message : "알 수 없는 오류"}`);
-    } finally {
-      setIsAnalysisLoading(false);
-    }
-  };
-
-  // ── 3→4단계 ─────────────────────────────────────────────────────────────
-  const handleAnalysisComplete = () => {
-    if (!canFinishAnalysis) return;
-    setIsAnalysisComplete(true);
-    setCurrentStep(4);
-  };
-
-  // ── 문제 생성 ────────────────────────────────────────────────────────────
-  const handleGenerate = async () => {
-    if (!canGenerate || !structuredResult || !analysisResult) return;
-    setIsGenerationLoading(true);
-    setIsGenerationComplete(false);
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ structured: structuredResult, analysis: analysisResult }),
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `오류 ${res.status}`);
-      const { result }: { result: GenerationResult } = await res.json();
-      setGenerationResult(result);
-      setIsGenerationComplete(true);
-    } catch (err) {
-      alert(`문제 생성 오류:\n${err instanceof Error ? err.message : "알 수 없는 오류"}`);
-    } finally {
-      setIsGenerationLoading(false);
-    }
-  };
-
-  const handleGenerationComplete = () => {
-    if (!canFinishGeneration) return;
-    setIsGenerationComplete(true);
-  };
-
-  // ── 저장 ─────────────────────────────────────────────────────────────────
-  const handleSave = async (meta: {
-    title: string; schoolName: string; grade: string;
-    subjectArea: string; unitName: string; difficulty: string;
-  }) => {
-    const res = await fetch("/api/problems", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        meta,
-        ocrRawText: ocrRawText,
-        ocrEditedText: editedOcrText,
-        structured: structuredResult,
-        analysis: analysisResult,
-        generation: generationResult,
-      }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "저장 실패");
-    setSavedId(data.id);
-    setShowSaveModal(false);
-  };
+  }, []);
 
-  // ── 단계 클릭 ────────────────────────────────────────────────────────────
-  const handleStepClick = (step: number) => {
-    if (step === 1) setCurrentStep(1);
-    else if (step === 2 && canGoToStep2) setCurrentStep(2);
-    else if (step === 3 && canGoToStep3) setCurrentStep(3);
-    else if (step === 4 && canGoToStep4) setCurrentStep(4);
-  };
-
-  function StepBadge({ step, label }: { step: number; label: string }) {
-    const done = currentStep > step;
-    const active = currentStep === step;
-    const available =
-      step === 1 ? true :
-      step === 2 ? canGoToStep2 :
-      step === 3 ? canGoToStep3 :
-      step === 4 ? canGoToStep4 : false;
-
-    return (
-      <button
-        onClick={() => handleStepClick(step)}
-        disabled={!available && !active}
-        className={`flex items-center gap-1.5 transition-opacity ${
-          !available && !active ? "opacity-40 cursor-not-allowed" : active ? "opacity-100" : "opacity-60 hover:opacity-80"
-        }`}
-      >
-        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-          active ? "bg-blue-600 text-white" : done ? "bg-green-500 text-white" : "bg-gray-300 text-gray-500"
-        }`}>
-          {done ? (
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
-          ) : step}
-        </div>
-        <span className={`text-sm font-medium ${active ? "text-blue-600" : done ? "text-green-600" : "text-gray-500"}`}>
-          {label}
-        </span>
-      </button>
-    );
-  }
-
-  // ── 렌더링 ───────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
-      <header className="bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center flex-shrink-0">
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-gray-900">국어 문제은행</h1>
-            <p className="text-xs text-gray-500 -mt-0.5">OCR · 구조화 · 분석 · 문제 생성</p>
+          <div className="flex-1">
+            <h1 className="text-base font-bold text-gray-900 leading-tight">국어 문제은행</h1>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <Link href="/source-passages"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-teal-600 bg-teal-50 hover:bg-teal-100 transition-colors">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-              지문 등록
-            </Link>
-            <Link href="/pattern-remix"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              패턴 재구성
-            </Link>
-            <Link href="/problems"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-              </svg>
-              문제은행
-            </Link>
-            <AuthUserMenu />
-            <StepBadge step={1} label="OCR" />
-            <div className="w-6 h-px bg-gray-300" />
-            <StepBadge step={2} label="구조화" />
-            <div className="w-6 h-px bg-gray-300" />
-            <StepBadge step={3} label="분석" />
-            <div className="w-6 h-px bg-gray-300" />
-            <StepBadge step={4} label="문제 생성" />
-          </div>
+          <AuthUserMenu />
         </div>
       </header>
 
-      {/* 완료 배너 */}
-      {isOcrComplete && currentStep === 1 && (
-        <div className="bg-green-50 border-b border-green-200 flex-shrink-0">
-          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-2 text-green-700 text-sm font-medium">
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            OCR 완료. 2단계로 이동하세요.
-          </div>
-        </div>
-      )}
-      {isStructureComplete && currentStep === 2 && (
-        <div className="bg-green-50 border-b border-green-200 flex-shrink-0">
-          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-2 text-green-700 text-sm font-medium">
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            구조화 완료. 3단계로 이동하세요.
-          </div>
-        </div>
-      )}
-      {isAnalysisComplete && currentStep === 3 && (
-        <div className="bg-green-50 border-b border-green-200 flex-shrink-0">
-          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-2 text-green-700 text-sm font-medium">
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            분석 완료. 4단계로 이동하세요.
-          </div>
-        </div>
-      )}
-      {isGenerationComplete && currentStep === 4 && (
-        <div className="bg-green-50 border-b border-green-200 flex-shrink-0">
-          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-2 text-green-700 text-sm font-medium">
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            문제 생성 완료.
-          </div>
-        </div>
-      )}
+      <main className="max-w-lg mx-auto px-4 py-5 flex flex-col gap-4">
 
-      {/* 메인 콘텐츠 */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 flex flex-col gap-6 min-h-0">
+        {/* 통계 배너 */}
+        <div className="bg-green-600 rounded-2xl p-5 text-white">
+          <p className="text-sm font-medium opacity-90 mb-3">내 학습 자료 현황</p>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: "패턴 세트", value: stats?.patternSets ?? "-", href: "/pattern-remix/library" },
+              { label: "지문", value: stats?.passages ?? "-", href: "/source-passages/library" },
+              { label: "문제 세트", value: stats?.questionSets ?? "-", href: "/pattern-remix/generate/library" },
+            ].map(item => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="bg-white/20 hover:bg-white/30 active:bg-white/40 rounded-xl px-3 py-2.5 text-center transition-colors"
+              >
+                <p className="text-xl font-bold">{item.value}</p>
+                <p className="text-xs opacity-80 mt-0.5">{item.label}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
 
-        {/* 1단계 */}
-        {currentStep === 1 && (
-          <>
-            <div className="flex gap-6 flex-1 min-h-0">
-              <div className="w-[45%] flex-shrink-0 bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col">
-                <ImageUploader />
-              </div>
-              <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col">
-                <OCREditor />
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-6 py-4 flex items-center justify-between gap-4 flex-shrink-0">
-              <p className="text-sm text-gray-500">
-                {uploadedImages.length === 0 ? "시험지 이미지를 업로드하고 OCR을 실행하세요."
-                  : isOcrLoading ? "OCR 분석 중... (30초 이상 걸릴 수 있습니다)"
-                  : editedOcrText ? "텍스트를 확인·수정한 후 수정 완료를 눌러주세요."
-                  : `${uploadedImages.length}장 업로드됨. OCR을 실행하세요.`}
-              </p>
-              <div className="flex items-center gap-3">
-                <button onClick={handleOcrRun} disabled={!canRunOcr}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${canRunOcr ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}>
-                  {isOcrLoading ? <><Spinner /> OCR 실행 중...</> : <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                    OCR 실행
-                  </>}
-                </button>
-                <button onClick={handleComplete} disabled={!canComplete}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${canComplete ? isOcrComplete ? "bg-green-100 text-green-700 border border-green-300 hover:bg-green-200" : "bg-green-600 text-white hover:bg-green-700 shadow-sm" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        {/* 빠른 실행 */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <p className="text-sm font-bold text-gray-800 mb-3">빠른 실행</p>
+          <div className="grid grid-cols-2 gap-3">
+            {QUICK_ACTIONS.map(action => (
+              <Link
+                key={action.href}
+                href={action.href}
+                className={`flex items-center gap-3 p-3 rounded-xl border transition-all hover:shadow-sm active:scale-95 ${action.color}`}
+              >
+                <div className="flex-shrink-0">{action.icon}</div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 leading-tight">{action.label}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 leading-tight">{action.sub}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* 문제 만들기 흐름 안내 */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <p className="text-sm font-bold text-gray-800 mb-3">문제 만들기 순서</p>
+          <div className="flex flex-col gap-0">
+            {[
+              { step: 1, label: "기출 시험지 등록", sub: "이미지 업로드 → OCR → 패턴 추출", href: "/pattern-remix", color: "bg-green-600" },
+              { step: 2, label: "새 지문 등록", sub: "출제할 지문 텍스트 또는 이미지 입력", href: "/source-passages", color: "bg-green-600" },
+              { step: 3, label: "문제 자동 생성", sub: "패턴 × 지문 → Claude AI가 문항 생성", href: "/pattern-remix/generate", color: "bg-purple-600" },
+            ].map((item, i, arr) => (
+              <div key={item.step}>
+                <Link
+                  href={item.href}
+                  className="flex items-center gap-3 py-3 px-1 rounded-xl hover:bg-gray-50 transition-colors active:bg-gray-100"
+                >
+                  <div className={`w-7 h-7 rounded-full ${item.color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                    {item.step}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">{item.label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{item.sub}</p>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  {isOcrComplete ? "완료됨 (2단계로 이동)" : "수정 완료"}
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* 2단계 */}
-        {currentStep === 2 && (
-          <>
-            <div className="flex-1 min-h-0"><StructuredView /></div>
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-6 py-4 flex items-center justify-between gap-4 flex-shrink-0">
-              <p className="text-sm text-gray-500">
-                {isStructureLoading ? "AI 분석 중... (20~40초 소요)"
-                  : isStructureComplete ? "구조화 완료."
-                  : structuredResult ? "결과를 확인·수정한 후 구조화 완료를 눌러주세요."
-                  : structuredResults.length > 1 && selectedGroupIndex === -1 ? "오른쪽에서 분석할 지문 그룹을 선택하세요."
-                  : "구조화 분석을 시작하세요."}
-              </p>
-              <div className="flex items-center gap-3">
-                <button onClick={handleStructureAnalysis} disabled={!canStructure}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${canStructure ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}>
-                  {isStructureLoading ? <><Spinner /> 분석 중...</> : <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                    구조화 분석
-                  </>}
-                </button>
-                <button onClick={handleStructureComplete} disabled={!canFinishStructure}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${canFinishStructure ? isStructureComplete ? "bg-green-100 text-green-700 border border-green-300 hover:bg-green-200" : "bg-green-600 text-white hover:bg-green-700 shadow-sm" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  {isStructureComplete ? "완료됨 (3단계로 이동)" : "구조화 완료"}
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* 3단계 */}
-        {currentStep === 3 && (
-          <>
-            <div className="flex-1 min-h-0"><AnalysisView /></div>
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-6 py-4 flex items-center justify-between gap-4 flex-shrink-0">
-              <p className="text-sm text-gray-500">
-                {isAnalysisLoading ? "AI 분석 중... (20~40초 소요)" : isAnalysisComplete ? "분석 완료."
-                  : analysisResult ? "분석 결과를 확인하세요." : "문항 분석을 시작하세요."}
-              </p>
-              <div className="flex items-center gap-3">
-                <button onClick={handleAnalysis} disabled={!canAnalyze}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${canAnalyze ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}>
-                  {isAnalysisLoading ? <><Spinner /> 분석 중...</> : <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                    문항 분석
-                  </>}
-                </button>
-                <button onClick={handleAnalysisComplete} disabled={!canFinishAnalysis}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${canFinishAnalysis ? isAnalysisComplete ? "bg-green-100 text-green-700 border border-green-300 hover:bg-green-200" : "bg-green-600 text-white hover:bg-green-700 shadow-sm" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  {isAnalysisComplete ? "완료됨 (4단계로 이동)" : "분석 완료"}
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* 4단계 */}
-        {currentStep === 4 && (
-          <>
-            <div className="flex-1 min-h-0"><GenerationView /></div>
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-6 py-4 flex items-center justify-between gap-4 flex-shrink-0">
-              <p className="text-sm text-gray-500">
-                {isGenerationLoading ? "유사·변형 문제를 생성 중입니다... (30~60초 소요)"
-                  : savedId ? "저장 완료! 문제은행에서 확인하세요."
-                  : generationResult ? "생성된 문제를 확인하고 저장하세요."
-                  : "문제 생성 버튼을 눌러 유사·변형 문제를 생성하세요."}
-              </p>
-              <div className="flex items-center gap-3">
-                <button onClick={handleGenerate} disabled={!canGenerate}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${canGenerate ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}>
-                  {isGenerationLoading ? <><Spinner /> 생성 중...</> : <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    문제 생성
-                  </>}
-                </button>
-                {/* 저장 버튼 */}
-                {savedId ? (
-                  <Link href={`/problems/${savedId}`}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-100 text-green-700 border border-green-300 hover:bg-green-200 transition-colors">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    저장됨 — 상세 보기
-                  </Link>
-                ) : (
-                  <button onClick={() => setShowSaveModal(true)} disabled={!generationResult && !structuredResult}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${(generationResult || structuredResult) ? "bg-green-600 text-white hover:bg-green-700 shadow-sm" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                    </svg>
-                    문제은행에 저장
-                  </button>
+                </Link>
+                {i < arr.length - 1 && (
+                  <div className="ml-6 flex items-center gap-1 py-0.5">
+                    <div className="w-px h-4 bg-gray-200 ml-3" />
+                  </div>
                 )}
               </div>
-            </div>
-          </>
-        )}
+            ))}
+          </div>
+        </div>
+
+        {/* 라이브러리 */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <p className="text-sm font-bold text-gray-800 mb-3">라이브러리</p>
+          <div className="flex flex-col divide-y divide-gray-50">
+            {LIBRARY_LINKS.map(link => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="flex items-center gap-3 py-3 hover:bg-gray-50 rounded-xl px-1 transition-colors active:bg-gray-100"
+              >
+                <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">{link.label}</p>
+                  <p className="text-xs text-gray-500">{link.sub}</p>
+                </div>
+                <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* AI 안내 */}
+        <div className="bg-green-50 border border-green-100 rounded-2xl px-4 py-3.5 flex items-start gap-3">
+          <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <div>
+            <p className="text-sm font-semibold text-green-800">빠른 문제 생성</p>
+            <p className="text-xs text-green-700 mt-0.5 leading-relaxed">구조화·패턴 추출이 단일 AI 호출로 통합되어 약 40% 빠르게 처리됩니다.</p>
+          </div>
+        </div>
+
       </main>
-
-      {/* 저장 모달 */}
-      {showSaveModal && (
-        <SaveModal
-          onSave={handleSave}
-          onClose={() => setShowSaveModal(false)}
-          defaultArea={structuredResult?.area ?? ""}
-        />
-      )}
     </div>
-  );
-}
-
-export default function Home() {
-  return (
-    <AppProvider>
-      <MainContent />
-    </AppProvider>
   );
 }

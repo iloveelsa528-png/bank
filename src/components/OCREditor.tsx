@@ -47,7 +47,7 @@ const STATUS_CONFIG: Record<OcrStatus, { label: string; color: string; icon: Rea
   },
   loading: {
     label: "OCR 실행 중...",
-    color: "text-blue-600",
+    color: "text-green-600",
     icon: (
       <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -115,7 +115,7 @@ export default function OCREditor() {
             placeholder:text-gray-400 placeholder:font-sans placeholder:text-center
             ${
               isEditable
-                ? "bg-white border-gray-300 text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                ? "bg-white border-gray-300 text-gray-800 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
                 : status === "loading"
                 ? "bg-blue-50 border-blue-200 text-gray-400 cursor-not-allowed"
                 : "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"

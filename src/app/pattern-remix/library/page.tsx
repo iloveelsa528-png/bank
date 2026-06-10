@@ -117,7 +117,12 @@ export default function PatternLibraryPage() {
                     </div>
                     {ps.description && <p className="text-xs text-gray-500 mt-1">{ps.description}</p>}
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                    <Link
+                      href={`/pattern-remix/generate?pattern=${ps.id}`}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 transition-colors">
+                      문제 생성 →
+                    </Link>
                     <button
                       onClick={() => setExpanded((v) => v === ps.id ? null : ps.id)}
                       className="px-3 py-1.5 rounded-lg text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors">

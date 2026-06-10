@@ -4,12 +4,15 @@ import { useState } from "react";
 import { createBrowserSupabase } from "@/lib/supabase-browser";
 import { useRouter } from "next/navigation";
 
+import Link from "next/link";
+
 interface Props {
   email: string;
   avatarUrl?: string;
+  pendingNeighborCount?: number;
 }
 
-export default function UserMenu({ email, avatarUrl }: Props) {
+export default function UserMenu({ email, avatarUrl, pendingNeighborCount = 0 }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -30,14 +33,21 @@ export default function UserMenu({ email, avatarUrl }: Props) {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
       >
-        {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt="avatar" className="w-7 h-7 rounded-full" />
-        ) : (
-          <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold text-white">
-            {initial}
-          </div>
-        )}
+        <div className="relative">
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatarUrl} alt="avatar" className="w-7 h-7 rounded-full" />
+          ) : (
+            <div className="w-7 h-7 rounded-full bg-green-600 flex items-center justify-center text-xs font-bold text-white">
+              {initial}
+            </div>
+          )}
+          {pendingNeighborCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+              {pendingNeighborCount > 9 ? "9+" : pendingNeighborCount}
+            </span>
+          )}
+        </div>
         <span className="text-xs text-gray-600 max-w-[120px] truncate hidden sm:block">{email}</span>
         <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -51,6 +61,19 @@ export default function UserMenu({ email, avatarUrl }: Props) {
             <div className="px-3 py-2 border-b border-gray-100">
               <p className="text-xs text-gray-500 truncate">{email}</p>
             </div>
+            <Link
+              href="/neighbors"
+              onClick={() => setOpen(false)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <span>👥</span>
+              <span>서로이웃 관리</span>
+              {pendingNeighborCount > 0 && (
+                <span className="ml-auto bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                  {pendingNeighborCount}
+                </span>
+              )}
+            </Link>
             <button
               onClick={handleSignOut}
               disabled={loading}

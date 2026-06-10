@@ -143,7 +143,12 @@ export default function PassageLibraryPage() {
                       <p className="text-xs text-gray-500 mt-1 line-clamp-2">{p.analysis_summary}</p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                    <Link
+                      href={`/pattern-remix/generate?passage=${p.id}`}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 transition-colors">
+                      문제 생성 →
+                    </Link>
                     <button
                       onClick={() => setExpanded((v) => v === p.id ? null : p.id)}
                       className="px-3 py-1.5 rounded-lg text-xs font-medium text-teal-600 bg-teal-50 hover:bg-teal-100 transition-colors">

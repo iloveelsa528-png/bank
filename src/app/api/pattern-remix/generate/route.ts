@@ -4,6 +4,8 @@ import { jsonSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/json-schema";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { PatternBasedQuestion } from "@/types/pattern-remix";
 
+export const maxDuration = 300;
+
 const client = new Anthropic();
 
 const GenerationSchema = {
@@ -71,8 +73,9 @@ export async function POST(request: NextRequest) {
         .single(),
     ]);
 
-    if (!patternSet) return NextResponse.json({ error: "패턴 세트를 찾을 수 없습니다." }, { status: 404 });
-    if (!passage) return NextResponse.json({ error: "지문을 찾을 수 없습니다." }, { status: 404 });
+    if (!patternSet) return NextResponse.json({ error: "패턴 세트를 찾을 수 없습니다. 본인 소유의 패턴 세트인지 확인하세요." }, { status: 404 });
+    if (!passage) return NextResponse.json({ error: "지문을 찾을 수 없습니다. 본인 소유의 지문인지 확인하세요." }, { status: 404 });
+    if (!passage.passage_text?.trim()) return NextResponse.json({ error: "선택한 지문에 텍스트가 없습니다. 지문 등록에서 내용을 입력해주세요." }, { status: 400 });
 
     const patterns = patternSet.exam_patterns ?? [];
     if (patterns.length === 0) {

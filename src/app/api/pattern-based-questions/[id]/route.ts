@@ -30,7 +30,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!user) return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
 
     const body = await request.json();
-    const { title, generated_questions, difficulty, area } = body;
+    const { title, generated_questions, difficulty, area, visibility } = body;
 
     const { error } = await supabase
       .from("pattern_based_questions")
@@ -39,6 +39,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         ...(generated_questions !== undefined && { generated_questions }),
         ...(difficulty !== undefined && { difficulty }),
         ...(area !== undefined && { area }),
+        ...(visibility !== undefined && { visibility }),
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)

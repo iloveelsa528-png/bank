@@ -174,7 +174,7 @@ export default function StructuredView() {
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-xs text-blue-600 font-medium">{group.questions.length}문제</span>
-                    <span className="text-xs text-blue-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-xs text-green-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
                       선택 →
                     </span>
                   </div>
@@ -198,7 +198,7 @@ export default function StructuredView() {
                 </div>
                 <button
                   onClick={handleResetGroupSelection}
-                  className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 text-xs font-medium text-green-600 hover:text-green-800 hover:bg-green-100 px-2.5 py-1 rounded-lg transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -254,7 +254,7 @@ export default function StructuredView() {
                     }))
                   }
                   rows={8}
-                  className="w-full resize-y rounded-xl border border-gray-300 p-3 text-sm text-gray-700 leading-relaxed focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-colors"
+                  className="w-full resize-y rounded-xl border border-gray-300 p-3 text-sm text-gray-700 leading-relaxed focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-colors"
                   placeholder="지문 내용을 입력하세요."
                 />
               </div>
@@ -273,7 +273,7 @@ export default function StructuredView() {
                     }))
                   }
                   rows={4}
-                  className="w-full resize-y rounded-xl border border-gray-300 p-3 text-sm text-gray-700 leading-relaxed focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-colors"
+                  className="w-full resize-y rounded-xl border border-gray-300 p-3 text-sm text-gray-700 leading-relaxed focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-colors"
                   placeholder="공통 보기 내용을 입력하세요."
                 />
               </div>
@@ -300,7 +300,7 @@ export default function StructuredView() {
                     }))
                   }
                   rows={3}
-                  className="w-full resize-y rounded-xl border border-gray-300 p-3 text-sm text-gray-700 leading-relaxed focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-colors"
+                  className="w-full resize-y rounded-xl border border-gray-300 p-3 text-sm text-gray-700 leading-relaxed focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-colors"
                   placeholder="발문을 입력하세요."
                 />
 
@@ -317,7 +317,7 @@ export default function StructuredView() {
                         }))
                       }
                       rows={3}
-                      className="w-full resize-y rounded-xl border border-gray-300 p-3 text-sm text-gray-700 leading-relaxed focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-colors"
+                      className="w-full resize-y rounded-xl border border-gray-300 p-3 text-sm text-gray-700 leading-relaxed focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-colors"
                       placeholder="보기 내용을 입력하세요."
                     />
                   </div>
@@ -337,7 +337,7 @@ export default function StructuredView() {
                           onChange={(e) =>
                             updateChoice(question.id, choice.number, e.target.value)
                           }
-                          className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-colors"
+                          className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-colors"
                           placeholder={`선택지 ${choice.number}`}
                         />
                       </div>

@@ -4,7 +4,7 @@ import { downloadPdf } from "@/lib/pdf/download";
 import type { PdfData, PdfMode } from "@/lib/pdf/generate";
 
 const MODES: { mode: PdfMode; label: string; color: string }[] = [
-  { mode: "student", label: "학생용", color: "bg-blue-600 hover:bg-blue-700" },
+  { mode: "student", label: "학생용", color: "bg-green-600 hover:bg-green-700" },
   { mode: "teacher", label: "교사용", color: "bg-green-600 hover:bg-green-700" },
   { mode: "full",    label: "전체본", color: "bg-purple-600 hover:bg-purple-700" },
 ];
