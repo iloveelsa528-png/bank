@@ -182,8 +182,12 @@ export default function PatternRemixPage() {
       images.forEach((f, i) => formData.append(`image_${i}`, f));
       formData.append("imageCount", String(images.length));
       const res = await fetch("/api/ocr", { method: "POST", body: formData });
-      if (!res.ok) throw new Error((await res.json()).error || "OCR 오류");
-      const { text } = await res.json();
+      const ocrRaw = await res.text();
+      let ocrBody: { text?: string; error?: string };
+      try { ocrBody = JSON.parse(ocrRaw); }
+      catch { throw new Error(res.status === 504 ? "OCR 시간이 초과됐습니다. 페이지 수를 줄여주세요." : "서버 오류가 발생했습니다."); }
+      if (!res.ok) throw new Error(ocrBody.error || "OCR 오류");
+      const { text } = ocrBody;
       setOcrText(text ?? "");
       setOcrDone(true);
     } catch (e) {
@@ -204,8 +208,12 @@ export default function PatternRemixPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: ocrText }),
       });
-      if (!res.ok) throw new Error((await res.json()).error || "분석 오류");
-      const { groups: g }: { groups: AnalyzedGroup[] } = await res.json();
+      const rawText = await res.text();
+      let body: { groups?: AnalyzedGroup[]; error?: string };
+      try { body = JSON.parse(rawText); }
+      catch { throw new Error(res.status === 504 ? "분석 시간이 초과됐습니다. 페이지 수를 줄이거나 다시 시도해주세요." : "서버 오류가 발생했습니다."); }
+      if (!res.ok) throw new Error(body.error || "분석 오류");
+      const g = body.groups ?? [];
       setGroups(g);
       if (g.length === 1) {
         setSelectedGroup(g[0]);
