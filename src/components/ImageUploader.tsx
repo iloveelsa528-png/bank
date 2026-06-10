@@ -101,15 +101,15 @@ export default function ImageUploader() {
             transition-colors duration-200
             ${
               isDragging
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50"
+                ? "border-green-500 bg-green-50"
+                : "border-gray-300 bg-gray-50 hover:border-green-400 hover:bg-green-50"
             }
           `}
         >
           {/* 아이콘 */}
           <div
             className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${
-              isDragging ? "bg-blue-100" : "bg-gray-100"
+              isDragging ? "bg-green-100" : "bg-gray-100"
             }`}
           >
             <svg

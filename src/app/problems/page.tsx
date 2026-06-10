@@ -120,21 +120,21 @@ export default function ProblemsPage() {
           <div>
             <label className="text-xs font-semibold text-gray-500 mb-1 block">학년</label>
             <select value={grade} onChange={(e) => setGrade(e.target.value)}
-              className="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500">
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:border-green-500">
               {GRADES.map((g) => <option key={g} value={g}>{g || "전체"}</option>)}
             </select>
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-500 mb-1 block">영역</label>
             <select value={area} onChange={(e) => setArea(e.target.value)}
-              className="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500">
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:border-green-500">
               {AREAS.map((a) => <option key={a} value={a}>{a || "전체"}</option>)}
             </select>
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-500 mb-1 block">난이도</label>
             <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}
-              className="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500">
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:border-green-500">
               {DIFFICULTIES.map((d) => <option key={d} value={d}>{d || "전체"}</option>)}
             </select>
           </div>
@@ -143,7 +143,7 @@ export default function ProblemsPage() {
         {/* 목록 */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <svg className="w-8 h-8 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+            <svg className="w-8 h-8 animate-spin text-green-500" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
@@ -162,7 +162,7 @@ export default function ProblemsPage() {
           <div className="flex flex-col gap-3">
             <p className="text-xs text-gray-500">{problems.length}개 문제</p>
             {problems.map((p) => (
-              <div key={p.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex items-start gap-4 hover:border-blue-200 transition-colors">
+              <div key={p.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex items-start gap-4 hover:border-green-200 transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     {p.subject_area && (

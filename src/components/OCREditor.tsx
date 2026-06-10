@@ -117,7 +117,7 @@ export default function OCREditor() {
               isEditable
                 ? "bg-white border-gray-300 text-gray-800 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
                 : status === "loading"
-                ? "bg-blue-50 border-blue-200 text-gray-400 cursor-not-allowed"
+                ? "bg-green-50 border-green-200 text-gray-400 cursor-not-allowed"
                 : "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
             }
           `}
@@ -126,8 +126,8 @@ export default function OCREditor() {
 
         {/* 로딩 오버레이 */}
         {status === "loading" && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-blue-50/60">
-            <div className="flex flex-col items-center gap-3 text-blue-600">
+          <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-green-50/60">
+            <div className="flex flex-col items-center gap-3 text-green-600">
               <svg className="w-10 h-10 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle
                   className="opacity-25"

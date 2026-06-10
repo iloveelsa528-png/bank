@@ -180,8 +180,8 @@ function ExplorePageInner() {
           </div>
         ) : sets.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center">
-              <svg className="w-7 h-7 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center">
+              <svg className="w-7 h-7 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                   d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -194,7 +194,7 @@ function ExplorePageInner() {
             {(search || area !== "전체") && (
               <button
                 onClick={() => { setSearch(""); setArea("전체"); }}
-                className="text-sm text-blue-600 hover:underline"
+                className="text-sm text-green-600 hover:underline"
               >
                 전체 보기
               </button>
@@ -285,7 +285,7 @@ export default function ExplorePage() {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center min-h-screen">
-        <svg className="w-8 h-8 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+        <svg className="w-8 h-8 animate-spin text-green-500" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
