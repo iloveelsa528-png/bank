@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { ExamPattern, ExamPatternSetMeta } from '@/types/patterns';
 
 interface AnalyzedGroup {
@@ -72,6 +72,8 @@ function PatternTag({ pattern }: { pattern: ExamPattern }) {
   );
 }
 
+const MEMO_KEY = 'examMeta';
+
 export default function ExamResultView({ groups, jobId, onSaved }: ExamResultViewProps) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(groups.length === 1 ? 0 : null);
   const [meta, setMeta] = useState<ExamPatternSetMeta>({
@@ -81,6 +83,26 @@ export default function ExamResultView({ groups, jobId, onSaved }: ExamResultVie
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState('');
+
+  // 이전에 입력한 학교·학년·학기 불러오기
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(MEMO_KEY);
+      if (saved) {
+        const { school_name, grade, semester } = JSON.parse(saved);
+        setMeta(m => ({ ...m, school_name: school_name ?? '', grade: grade ?? '', semester: semester ?? '' }));
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // 학교·학년·학기·시험명이 채워지면 제목 자동생성
+  useEffect(() => {
+    const parts = [meta.school_name, meta.grade, meta.semester, meta.exam_name].filter(Boolean);
+    if (parts.length >= 2 && !meta.title) {
+      setMeta(m => ({ ...m, title: parts.join(' ') }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meta.school_name, meta.grade, meta.semester, meta.exam_name]);
 
   const selectedGroup = selectedIdx !== null ? groups[selectedIdx] : null;
 
@@ -96,6 +118,10 @@ export default function ExamResultView({ groups, jobId, onSaved }: ExamResultVie
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? '저장 실패');
+      // 학교·학년·학기 기억
+      localStorage.setItem(MEMO_KEY, JSON.stringify({
+        school_name: meta.school_name, grade: meta.grade, semester: meta.semester,
+      }));
       setSavedId(data.id);
       onSaved?.(data.id);
     } catch (e) {
@@ -107,22 +133,28 @@ export default function ExamResultView({ groups, jobId, onSaved }: ExamResultVie
 
   if (savedId) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-2xl p-5 flex flex-col gap-3">
+      <div className="bg-green-50 border border-green-200 rounded-2xl p-5 flex flex-col gap-4">
         <div className="flex items-center gap-2">
           <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
           </svg>
           <span className="text-sm font-semibold text-green-700">패턴 세트가 저장되었습니다.</span>
         </div>
+        <a href="/source-passages"
+          className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold bg-green-600 text-white hover:bg-green-700 transition-colors shadow-sm">
+          2단계 — 지문 등록하러 가기 →
+        </a>
         <div className="flex gap-2 flex-wrap">
           <a href="/pattern-remix/library"
             className="px-3 py-1.5 rounded-lg text-xs font-medium text-green-700 bg-green-100 hover:bg-green-200 transition-colors">
             라이브러리 보기
           </a>
-          <button onClick={() => { setSavedId(null); setSelectedIdx(null); }}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-colors">
-            다른 그룹 저장
-          </button>
+          {groups.length > 1 && (
+            <button onClick={() => { setSavedId(null); setSelectedIdx(null); }}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-colors">
+              다른 그룹 저장
+            </button>
+          )}
         </div>
       </div>
     );

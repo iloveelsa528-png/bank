@@ -172,6 +172,7 @@ function PassageStep({
   selectedPattern,
   onSelect,
   onBack,
+  onRefresh,
 }: {
   passages: SourcePassage[];
   selected: SourcePassage | null;
@@ -179,6 +180,7 @@ function PassageStep({
   selectedPattern: ExamPatternSet | null;
   onSelect: (p: SourcePassage) => void;
   onBack: () => void;
+  onRefresh: () => void;
 }) {
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
@@ -205,12 +207,17 @@ function PassageStep({
           <p className="text-2xl mb-3">📖</p>
           <p className="text-gray-600 font-medium">아직 등록된 지문이 없습니다</p>
           <p className="text-sm text-gray-400 mt-1 mb-5">사진이나 텍스트로 지문을 등록하세요</p>
-          <Link
-            href="/source-passages"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 transition-colors"
-          >
-            지문 등록하러 가기 →
-          </Link>
+          <div className="flex flex-col items-center gap-3">
+            <Link
+              href="/source-passages"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 transition-colors"
+            >
+              지문 등록하러 가기 →
+            </Link>
+            <button onClick={onRefresh} className="text-xs text-gray-400 hover:text-gray-600 underline">
+              등록했는데 안 보이면 여기를 눌러 새로고침
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -783,6 +790,12 @@ function GeneratePageInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function refreshPassages() {
+    fetch("/api/source-passages").then(r => r.json()).then(sp => {
+      setPassages(sp.passages ?? []);
+    }).catch(() => {});
+  }
+
   function handleSelectPattern(p: ExamPatternSet) {
     setSelectedPattern(p);
     setWizardStep(2);
@@ -855,6 +868,7 @@ function GeneratePageInner() {
           selectedPattern={selectedPattern}
           onSelect={handleSelectPassage}
           onBack={() => setWizardStep(1)}
+          onRefresh={refreshPassages}
         />
       )}
 

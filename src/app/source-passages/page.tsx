@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CandidateQuestionPoint } from "@/types/passages";
 import JobRunner from "@/components/JobRunner";
@@ -42,6 +43,7 @@ function fmtSize(bytes: number) {
 type InputMode = "image" | "text";
 
 export default function SourcePassagesPage() {
+  const router = useRouter();
   const [mode, setMode]             = useState<InputMode>("image");
   const [images, setImages]         = useState<File[]>([]);
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -196,6 +198,8 @@ export default function SourcePassagesPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "저장 실패");
       setSavedId(data.id);
+      // 저장 완료 후 문제 생성 페이지로 이동
+      setTimeout(() => router.push("/pattern-remix/generate"), 1500);
     } catch (e) {
       setError(e instanceof Error ? e.message : "저장 실패");
     } finally {
