@@ -301,6 +301,14 @@ export default function PatternRemixPage() {
               패턴 세트가 저장되었습니다.
             </div>
             <div className="flex gap-2">
+              <Link href="/source-passages"
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-teal-700 bg-teal-100 hover:bg-teal-200 transition-colors flex items-center gap-1">
+                다음: 지문 등록 →
+              </Link>
+              <Link href="/pattern-remix/generate"
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 transition-colors flex items-center gap-1">
+                바로 문제 생성 →
+              </Link>
               <Link href="/pattern-remix/library"
                 className="px-3 py-1.5 rounded-lg text-xs font-medium text-green-700 bg-green-100 hover:bg-green-200 transition-colors">
                 라이브러리에서 보기
