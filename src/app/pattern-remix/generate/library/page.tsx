@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { PatternBasedQuestionSet, PatternBasedQuestion } from "@/types/pattern-remix";
+import PdfDownloadButtons from "@/components/PdfDownloadButtons";
+import type { PdfData } from "@/lib/pdf/generate";
 
 const DIFF_COLOR: Record<string, string> = {
   기본: "bg-green-100 text-green-800",
@@ -18,6 +20,17 @@ const TYPE_COLOR: Record<string, string> = {
   적용: "bg-cyan-100 text-cyan-700",
   서술형: "bg-gray-100 text-gray-700",
 };
+
+function toPdfData(s: PatternBasedQuestionSet): PdfData {
+  return {
+    title: s.title,
+    area: s.area,
+    patternSetTitle: s.exam_pattern_sets?.title,
+    passageTitle: s.source_passages?.title,
+    questions: s.generated_questions ?? [],
+    createdAt: s.created_at,
+  };
+}
 
 export default function PBQLibraryPage() {
   const [sets, setSets] = useState<PatternBasedQuestionSet[]>([]);
@@ -88,6 +101,9 @@ export default function PBQLibraryPage() {
                 <p className="text-xs text-gray-500 mt-1">
                   문제 {s.generated_questions?.length ?? 0}개
                 </p>
+                <div className="mt-2">
+                  <PdfDownloadButtons data={toPdfData(s)} />
+                </div>
               </div>
               <div className="flex gap-2 shrink-0">
                 <button

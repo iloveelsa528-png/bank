@@ -2,6 +2,8 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { PatternBasedQuestion, PatternBasedQuestionSet } from "@/types/pattern-remix";
+import PdfDownloadButtons from "@/components/PdfDownloadButtons";
+import type { PdfData } from "@/lib/pdf/generate";
 
 const DIFF_OPTIONS = ["기본", "응용", "고난도"];
 const TYPE_OPTIONS = ["내용이해", "추론", "표현분석", "어휘문법", "비판적사고", "적용", "서술형"];
@@ -117,8 +119,18 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
           <Link href="/pattern-remix/generate/library" className="text-purple-600 hover:text-purple-800 text-sm">← 라이브러리</Link>
           <h1 className="text-xl font-bold text-gray-900">문제 세트 편집</h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <span className="text-xs text-gray-500">채택 {adopted}/{states.length} · 검수완료 {reviewed}</span>
+          {questionSet && (
+            <PdfDownloadButtons data={{
+              title,
+              area: questionSet.area,
+              patternSetTitle: questionSet.exam_pattern_sets?.title,
+              passageTitle: questionSet.source_passages?.title,
+              questions: states.filter(s => !s.excluded).map(s => s.q),
+              createdAt: questionSet.created_at,
+            } satisfies PdfData} />
+          )}
           {saved && <span className="text-xs text-green-600 font-medium">저장됨 ✓</span>}
           <button
             onClick={saveAll}
