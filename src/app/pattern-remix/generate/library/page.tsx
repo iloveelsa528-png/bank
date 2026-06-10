@@ -96,6 +96,12 @@ export default function PBQLibraryPage() {
                 >
                   {expanded === s.id ? "접기" : "문제 보기"}
                 </button>
+                <Link
+                  href={`/pattern-remix/generate/${s.id}/edit`}
+                  className="text-sm text-gray-600 border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50"
+                >
+                  편집
+                </Link>
                 <button
                   onClick={() => del(s.id)}
                   disabled={deleting === s.id}

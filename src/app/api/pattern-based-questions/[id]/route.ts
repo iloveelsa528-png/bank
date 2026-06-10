@@ -22,6 +22,35 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const supabase = await createServerSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+
+    const body = await request.json();
+    const { title, generated_questions, difficulty, area } = body;
+
+    const { error } = await supabase
+      .from("pattern_based_questions")
+      .update({
+        ...(title !== undefined && { title }),
+        ...(generated_questions !== undefined && { generated_questions }),
+        ...(difficulty !== undefined && { difficulty }),
+        ...(area !== undefined && { area }),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("user_id", user.id);
+
+    if (error) throw error;
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "수정 실패" }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
