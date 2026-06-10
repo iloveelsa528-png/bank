@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import JobRunner from "@/components/JobRunner";
 import ExamResultView from "@/components/pattern/ExamResultView";
@@ -15,11 +15,13 @@ export default function PatternRemixPage() {
   const [images, setImages]       = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const [examJobId, setExamJobId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("examJobId");
-  });
+  const [examJobId, setExamJobId] = useState<string | null>(null);
   const [completedJob, setCompletedJob] = useState<Job | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("examJobId");
+    if (saved) setExamJobId(saved);
+  }, []);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []).filter(f => f.type.startsWith("image/"));
