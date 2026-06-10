@@ -25,13 +25,13 @@ export default function PatternRemixPage() {
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []).filter(f => f.type.startsWith("image/"));
-    setImages(prev => [...prev, ...files].slice(0, 10));
+    setImages(prev => [...prev, ...files].slice(0, 30));
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"));
-    setImages(prev => [...prev, ...files].slice(0, 10));
+    setImages(prev => [...prev, ...files].slice(0, 30));
   };
 
   const handleUpload = async () => {
@@ -108,7 +108,7 @@ export default function PatternRemixPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-700">시험지 사진을 여기에 올려주세요</p>
-                  <p className="text-xs text-gray-400 mt-1">클릭하거나 드래그 · JPG, PNG · 최대 10장</p>
+                  <p className="text-xs text-gray-400 mt-1">클릭하거나 드래그 · JPG, PNG · 최대 30장</p>
                 </div>
               </div>
             ) : (
@@ -136,7 +136,7 @@ export default function PatternRemixPage() {
                   onClick={() => document.getElementById("exam-file-input")?.click()}
                   className="w-full py-2.5 rounded-xl border-2 border-dashed border-gray-200 text-xs text-gray-400 hover:border-green-300 hover:text-green-600 transition-colors"
                 >
-                  + 사진 추가 ({images.length}/10)
+                  + 사진 추가 ({images.length}/30)
                 </button>
               </div>
             )}

@@ -84,12 +84,19 @@ export default function PBQLibraryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/pattern-remix/generate" className="text-purple-600 hover:text-purple-800 text-sm">← 문제 생성</Link>
-          <h1 className="text-xl font-bold text-gray-900">재구성 문제 라이브러리</h1>
+      <header className="bg-white border-b px-4 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link href="/pattern-remix/generate" className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </Link>
+          <div>
+            <h1 className="text-base font-bold text-gray-900">저장된 문제지</h1>
+            <p className="text-xs text-gray-400">생성한 문제지를 다운로드하거나 편집합니다</p>
+          </div>
         </div>
-        <span className="text-sm text-gray-500">{sets.length}개 저장됨</span>
+        <span className="text-sm text-gray-500 font-medium">{sets.length}개</span>
       </header>
 
       <main className="max-w-4xl mx-auto p-6 space-y-4">

@@ -85,7 +85,7 @@ export async function runGenerateChunk(
 
   const response = await client.messages.parse({
     model: 'claude-sonnet-4-6',
-    max_tokens: 4000,
+    max_tokens: 8000,
     system: `당신은 국어 내신 문제 출제 전문가입니다.
 기출문제에서 추출된 출제 패턴을 새 지문에 적용하여 내신 대비 문제를 생성합니다.
 

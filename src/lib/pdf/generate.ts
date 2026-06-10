@@ -33,7 +33,7 @@ export function buildFilename(data: PdfData, mode: PdfMode): string {
 }
 
 function choiceRow(num: number, text: string, isCorrect: boolean, reason: string, mode: PdfMode): string {
-  const mark = isCorrect ? "★" : "";
+  const mark = mode !== "student" && isCorrect ? "★" : "";
   const reasonPart = mode !== "student" ? `<span style="color:#666;font-size:11px;"> — ${reason}</span>` : "";
   return `
     <div style="display:flex;gap:8px;margin-bottom:4px;padding:4px 6px;border-radius:4px;background:${isCorrect && mode !== "student" ? "#f0fdf4" : "transparent"}">
@@ -101,10 +101,13 @@ export function buildHtml(data: PdfData, mode: PdfMode): string {
     : "";
 
   const passageSection = (data.passageText || imagesHtml) ? `
-    <div style="margin-bottom:24px;padding:16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px">
-      <h3 style="font-size:14px;font-weight:700;color:#374151;margin:0 0 10px">[지문] ${data.passageTitle ?? ""}</h3>
+    <div style="margin-bottom:28px;padding:20px;background:#fffbeb;border:2px solid #d97706;border-radius:8px;page-break-inside:avoid">
+      <h3 style="font-size:15px;font-weight:800;color:#92400e;margin:0 0 12px;border-bottom:1px solid #fcd34d;padding-bottom:8px">
+        ◆ 다음 글을 읽고 물음에 답하시오.
+        ${data.passageTitle ? `<span style="font-size:12px;font-weight:500;color:#b45309;margin-left:8px">(${data.passageTitle})</span>` : ""}
+      </h3>
       ${imagesHtml}
-      ${data.passageText ? `<p style="font-size:13px;color:#1f2937;line-height:1.8;white-space:pre-wrap;margin:0">${data.passageText}</p>` : ""}
+      ${data.passageText ? `<p style="font-size:14px;color:#1f2937;line-height:2;white-space:pre-wrap;margin:0;word-break:keep-all">${data.passageText}</p>` : ""}
       ${mode === "full" && data.keyPoints ? `<div style="margin-top:12px;padding:10px;background:#fff;border-left:3px solid #6d28d9;border-radius:4px;font-size:12px;color:#374151"><strong>핵심 내용</strong><br/><span style="white-space:pre-wrap">${data.keyPoints}</span></div>` : ""}
     </div>` : "";
 

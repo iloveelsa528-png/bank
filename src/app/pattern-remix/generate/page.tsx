@@ -6,6 +6,8 @@ import { ExamPatternSet } from "@/types/patterns";
 import { SourcePassage } from "@/types/passages";
 import { PatternBasedQuestion } from "@/types/pattern-remix";
 import JobRunner from "@/components/JobRunner";
+import PdfDownloadButtons from "@/components/PdfDownloadButtons";
+import type { PdfData } from "@/lib/pdf/generate";
 import type { Job } from "@/types/jobs";
 
 type WizardStep = 1 | 2 | 3;
@@ -711,22 +713,90 @@ function GenerateStep({
         </>
       )}
 
-      {/* 저장 완료 */}
+      {/* ── Sticky 저장 + 다운로드 바 ── */}
+      {editables.length > 0 && !savedId && (
+        <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-[60]">
+          <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <input
+                value={saveTitle}
+                onChange={e => { setSaveTitle(e.target.value); setError(""); }}
+                placeholder="문제 세트 제목"
+                className="w-full text-sm border border-gray-300 rounded-xl px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 bg-white"
+              />
+            </div>
+            <button
+              onClick={save}
+              disabled={saving || adopted === 0}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex-shrink-0 ${
+                !saving && adopted > 0
+                  ? "bg-green-600 text-white hover:bg-green-700 shadow-md"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              }`}
+            >
+              {saving
+                ? <><span className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin" /> 저장 중…</>
+                : <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  저장 &amp; 다운로드
+                </>}
+            </button>
+          </div>
+          <div className="max-w-3xl mx-auto px-4 pb-2 flex items-center justify-between">
+            <p className="text-xs text-gray-400">채택 {adopted}문항 · 제외 {editables.length - adopted}문항</p>
+            {error && <p className="text-xs text-red-500">{error}</p>}
+          </div>
+        </div>
+      )}
+
+      {/* 저장 완료 + 내보내기 */}
       {savedId && (
-        <div className="border-2 border-green-300 bg-green-50 rounded-2xl p-6 text-center">
-          <p className="text-3xl mb-2">🎉</p>
-          <p className="text-green-700 font-bold text-lg">저장 완료!</p>
-          <p className="text-sm text-green-600 mt-1 mb-5">{saveTitle}</p>
-          <div className="flex gap-2 justify-center flex-wrap">
+        <div className="space-y-4">
+          <div className="border-2 border-green-300 bg-green-50 rounded-2xl p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-green-700 font-bold">저장 완료!</p>
+              <p className="text-sm text-green-600 mt-0.5">{saveTitle}</p>
+            </div>
+          </div>
+
+          {/* 내보내기 */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-5">
+            <PdfDownloadButtons
+              large
+              data={{
+                title: saveTitle,
+                school: selectedPattern.school_name,
+                grade: selectedPattern.grade,
+                area: selectedPassage.area,
+                patternSetTitle: selectedPattern.title,
+                passageTitle: selectedPassage.title,
+                passageText: selectedPassage.passage_text,
+                passageImageUrls: selectedPassage.image_urls,
+                keyPoints: selectedPassage.key_points,
+                questions: editables
+                  .filter(e => !e.excluded)
+                  .map((e, i) => ({ ...e.draft, question_number: i + 1 })),
+              } satisfies PdfData}
+            />
+          </div>
+
+          <div className="flex gap-2 flex-wrap">
             <Link
               href={`/pattern-remix/generate/${savedId}/edit`}
-              className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 transition-colors"
+              className="px-4 py-2 border border-gray-200 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition-colors"
             >
-              계속 편집하기
+              편집하기
             </Link>
             <Link
               href="/pattern-remix/generate/library"
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 border border-gray-200 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition-colors"
             >
               문제 목록 보기
             </Link>
@@ -737,7 +807,7 @@ function GenerateStep({
                 setGenerateJobId(null);
                 setGenerateJobDone(false);
               }}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 border border-gray-200 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition-colors"
             >
               새로 생성하기
             </button>
@@ -773,14 +843,29 @@ function GeneratePageInner() {
       setPassages(loadedPassages);
 
       let step: WizardStep = 1;
+      let autoPattern: ExamPatternSet | null = null;
+      let autoPassage: SourcePassage | null = null;
+
       if (prePattern) {
         const found = loadedPatterns.find(p => p.id === prePattern);
-        if (found) { setSelectedPattern(found); step = 2; }
+        if (found) { autoPattern = found; step = 2; }
+      } else if (loadedPatterns.length === 1) {
+        // 패턴이 1개뿐이면 자동 선택
+        autoPattern = loadedPatterns[0];
+        step = 2;
       }
+
       if (prePassage) {
         const found = loadedPassages.find(p => p.id === prePassage);
-        if (found) { setSelectedPassage(found); if (step === 2) step = 3; }
+        if (found) { autoPassage = found; if (step === 2) step = 3; }
+      } else if (loadedPassages.length === 1 && step === 2) {
+        // 지문이 1개뿐이면 자동 선택
+        autoPassage = loadedPassages[0];
+        step = 3;
       }
+
+      if (autoPattern) setSelectedPattern(autoPattern);
+      if (autoPassage) setSelectedPassage(autoPassage);
       setWizardStep(step);
     }).catch(e => {
       setLoadError(e instanceof Error ? e.message : "데이터를 불러오지 못했습니다.");
