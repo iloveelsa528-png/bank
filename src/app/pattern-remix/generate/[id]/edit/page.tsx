@@ -124,9 +124,13 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
           {questionSet && (
             <PdfDownloadButtons data={{
               title,
+              school: questionSet.exam_pattern_sets?.school_name,
+              grade: questionSet.exam_pattern_sets?.grade,
               area: questionSet.area,
               patternSetTitle: questionSet.exam_pattern_sets?.title,
               passageTitle: questionSet.source_passages?.title,
+              passageText: questionSet.source_passages?.passage_text,
+              keyPoints: questionSet.source_passages?.key_points,
               questions: states.filter(s => !s.excluded).map(s => s.q),
               createdAt: questionSet.created_at,
             } satisfies PdfData} />

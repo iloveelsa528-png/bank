@@ -1,7 +1,7 @@
 import { buildHtml, buildFilename, type PdfData, type PdfMode } from "./generate";
 
 export async function downloadPdf(data: PdfData, mode: PdfMode) {
-  const { default: jsPDF } = await import("jspdf");
+  const { jsPDF } = await import("jspdf");
   const { default: html2canvas } = await import("html2canvas");
 
   const html = buildHtml(data, mode);

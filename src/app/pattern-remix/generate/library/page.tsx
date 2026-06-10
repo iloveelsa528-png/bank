@@ -24,9 +24,13 @@ const TYPE_COLOR: Record<string, string> = {
 function toPdfData(s: PatternBasedQuestionSet): PdfData {
   return {
     title: s.title,
+    school: s.exam_pattern_sets?.school_name,
+    grade: s.exam_pattern_sets?.grade,
     area: s.area,
     patternSetTitle: s.exam_pattern_sets?.title,
     passageTitle: s.source_passages?.title,
+    passageText: s.source_passages?.passage_text,
+    keyPoints: s.source_passages?.key_points,
     questions: s.generated_questions ?? [],
     createdAt: s.created_at,
   };
