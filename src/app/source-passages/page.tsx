@@ -2,9 +2,11 @@
 
 import React, { useState, useCallback } from "react";
 import Link from "next/link";
-import AuthUserMenu from "@/components/AuthUserMenu";
 import { CandidateQuestionPoint } from "@/types/passages";
-import { createBrowserSupabase } from "@/lib/supabase-browser";
+import JobRunner from "@/components/JobRunner";
+import type { Job } from "@/types/jobs";
+
+const PASSAGE_SYNC_LIMIT = 3000; // 이 길이 이하면 동기 분석, 초과면 job 분석
 
 const AREAS = ["문학", "독서", "문법", "화작"];
 const SOURCE_TYPES = ["교과서", "문학작품", "독서지문", "학교자료", "직접입력"];
@@ -57,6 +59,11 @@ export default function SourcePassagesPage() {
   const [candidatePoints, setCandidatePoints] = useState<CandidateQuestionPoint[]>([]);
   const [analyzing, setAnalyzing]             = useState(false);
 
+  // Job 기반 분석 (>3000자)
+  const [passageJobId, setPassageJobId]           = useState<string | null>(null);
+  const [passageJobDone, setPassageJobDone]       = useState(false);
+  const [sourceJobId, setSourceJobId]             = useState<string | null>(null);
+
   const [saving, setSaving]   = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError]     = useState("");
@@ -102,10 +109,39 @@ export default function SourcePassagesPage() {
     }
   };
 
+  const applyAnalysisResult = (data: { analysis_summary?: string; key_points?: string; candidate_question_points?: CandidateQuestionPoint[] }) => {
+    setAnalysisSummary(data.analysis_summary ?? "");
+    setKeyPoints(data.key_points ?? "");
+    setCandidatePoints(data.candidate_question_points ?? []);
+  };
+
   const handleAnalyze = async () => {
     if (!passageText.trim()) { alert("지문 내용을 입력하세요."); return; }
-    setAnalyzing(true);
     setAnalysisSummary(""); setKeyPoints(""); setCandidatePoints([]);
+    setPassageJobId(null); setPassageJobDone(false); setSourceJobId(null);
+
+    if (passageText.length > PASSAGE_SYNC_LIMIT) {
+      // Job 기반 분석 (긴 지문)
+      setAnalyzing(true);
+      try {
+        const res = await fetch("/api/source-passages/analyze-job", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ passage_text: passageText, area, source_type: sourceType }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "분석 job 생성 실패");
+        setPassageJobId(data.jobId);
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "분석 시작 실패");
+      } finally {
+        setAnalyzing(false);
+      }
+      return;
+    }
+
+    // 동기 분석 (≤3000자)
+    setAnalyzing(true);
     try {
       const res = await fetch("/api/source-passages/analyze", {
         method: "POST",
@@ -113,10 +149,7 @@ export default function SourcePassagesPage() {
         body: JSON.stringify({ passage_text: passageText, area, source_type: sourceType }),
       });
       if (!res.ok) throw new Error((await res.json()).error || "분석 오류");
-      const data = await res.json();
-      setAnalysisSummary(data.analysis_summary ?? "");
-      setKeyPoints(data.key_points ?? "");
-      setCandidatePoints(data.candidate_question_points ?? []);
+      applyAnalysisResult(await res.json());
     } catch (e) {
       alert(e instanceof Error ? e.message : "지문 분석 실패");
     } finally {
@@ -124,27 +157,20 @@ export default function SourcePassagesPage() {
     }
   };
 
+  const handleJobComplete = (job: Job) => {
+    if (!job.result) return;
+    const result = job.result as { analysis_summary?: string; key_points?: string; candidate_question_points?: CandidateQuestionPoint[] };
+    applyAnalysisResult(result);
+    setPassageJobDone(true);
+    setSourceJobId(job.id);
+  };
+
   const handleSave = async () => {
     if (!title.trim()) { setError("제목을 입력하세요."); return; }
     if (!passageText.trim()) { setError("지문 내용을 입력하세요."); return; }
     setSaving(true); setError("");
     try {
-      let imageUrls: string[] = [];
-      if (mode === "image" && images.length > 0) {
-        const supabase = createBrowserSupabase();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const uploads = await Promise.all(images.map(async (file, i) => {
-            const ext = file.name.split(".").pop() ?? "jpg";
-            const path = `${user.id}/${Date.now()}_${i}.${ext}`;
-            const { error } = await supabase.storage.from("passage-images").upload(path, file, { upsert: true });
-            if (error) throw new Error(`이미지 업로드 실패: ${error.message}`);
-            const { data: { publicUrl } } = supabase.storage.from("passage-images").getPublicUrl(path);
-            return publicUrl;
-          }));
-          imageUrls = uploads;
-        }
-      }
+      const imageUrls: string[] = [];
       const res = await fetch("/api/source-passages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -153,6 +179,7 @@ export default function SourcePassagesPage() {
           passage_text: passageText, ocr_raw_text: ocrRaw,
           analysis_summary: analysisSummary, key_points: keyPoints,
           candidate_question_points: candidatePoints, image_urls: imageUrls,
+          ...(sourceJobId ? { source_job_id: sourceJobId } : {}),
         }),
       });
       const data = await res.json();
@@ -169,6 +196,7 @@ export default function SourcePassagesPage() {
     setImages([]); setPassageText(""); setOcrRaw(""); setOcrDone(false);
     setTitle(""); setArea(""); setSourceType("");
     setAnalysisSummary(""); setKeyPoints(""); setCandidatePoints([]);
+    setPassageJobId(null); setPassageJobDone(false); setSourceJobId(null);
     setSavedId(null); setError("");
   };
 
@@ -198,7 +226,6 @@ export default function SourcePassagesPage() {
               className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 transition-colors">
               문제 생성 →
             </Link>
-            <AuthUserMenu />
           </div>
         </div>
       </header>
@@ -355,25 +382,42 @@ export default function SourcePassagesPage() {
             />
 
             {/* 지문 분석 버튼 — 텍스트 바로 아래 */}
-            <button
-              onClick={handleAnalyze}
-              disabled={!passageText.trim() || analyzing}
-              className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold transition-all ${
-                passageText.trim() && !analyzing
-                  ? "bg-teal-600 text-white hover:bg-teal-700 shadow-md ring-2 ring-teal-300 ring-offset-1"
-                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
-              }`}>
-              {analyzing
-                ? <><Spinner /> 지문 분석 중… (20~40초)</>
-                : <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                  지문 분석 시작
-                  {passageText.trim() && <span className="ml-1 text-teal-200 font-normal text-xs">(출제 요소 자동 추출)</span>}
-                </>
-              }
-            </button>
+            {(!passageJobId || passageJobDone) && (
+              <button
+                onClick={handleAnalyze}
+                disabled={!passageText.trim() || analyzing}
+                className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold transition-all ${
+                  passageText.trim() && !analyzing
+                    ? "bg-teal-600 text-white hover:bg-teal-700 shadow-md ring-2 ring-teal-300 ring-offset-1"
+                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                }`}>
+                {analyzing
+                  ? <><Spinner /> 지문 분석 중… (20~40초)</>
+                  : <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    지문 분석 시작
+                    {passageText.trim() && passageText.length > PASSAGE_SYNC_LIMIT && (
+                      <span className="ml-1 text-teal-200 font-normal text-xs">(장문 — Job 분석)</span>
+                    )}
+                    {passageText.trim() && passageText.length <= PASSAGE_SYNC_LIMIT && (
+                      <span className="ml-1 text-teal-200 font-normal text-xs">(출제 요소 자동 추출)</span>
+                    )}
+                  </>
+                }
+              </button>
+            )}
+
+            {/* Job 기반 분석 진행 (>3000자) */}
+            {passageJobId && !passageJobDone && (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-teal-600">장문 지문 분석 중 (Job)…</p>
+                <JobRunner jobId={passageJobId} onComplete={handleJobComplete} />
+                <button onClick={() => { setPassageJobId(null); setPassageJobDone(false); }}
+                  className="text-xs text-gray-400 hover:text-gray-600 underline self-start">취소</button>
+              </div>
+            )}
           </div>
         </div>
 

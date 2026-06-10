@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import AuthUserMenu from "@/components/AuthUserMenu";
 
 interface Stats {
   patternSets: number;
@@ -47,18 +46,6 @@ const QUICK_ACTIONS = [
     ),
     color: "bg-purple-50 border-purple-100",
   },
-  {
-    href: "/explore",
-    label: "자료 탐색",
-    sub: "공유 문제 세트 검색",
-    icon: (
-      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-      </svg>
-    ),
-    color: "bg-green-50 border-green-100",
-  },
 ];
 
 const LIBRARY_LINKS = [
@@ -98,7 +85,6 @@ export default function Home() {
           <div className="flex-1">
             <h1 className="text-base font-bold text-gray-900 leading-tight">국어 문제은행</h1>
           </div>
-          <AuthUserMenu />
         </div>
       </header>
 

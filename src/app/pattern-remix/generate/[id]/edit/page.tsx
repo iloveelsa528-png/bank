@@ -5,6 +5,37 @@ import { PatternBasedQuestion, PatternBasedQuestionSet } from "@/types/pattern-r
 import PdfDownloadButtons from "@/components/PdfDownloadButtons";
 import type { PdfData } from "@/lib/pdf/generate";
 
+function PassageCard({ title, text }: { title?: string; text: string }) {
+  const [open, setOpen] = useState(false);
+  const preview = text.slice(0, 120) + (text.length > 120 ? "…" : "");
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-amber-100/50 transition"
+      >
+        <span className="text-sm font-semibold text-amber-800">
+          지문{title ? ` — ${title}` : ""}
+        </span>
+        <svg
+          className={`w-4 h-4 text-amber-600 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {!open && (
+        <p className="px-4 pb-3 text-xs text-amber-700 leading-relaxed">{preview}</p>
+      )}
+      {open && (
+        <div className="px-4 pb-4">
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{text}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const DIFF_OPTIONS = ["기본", "응용", "고난도"];
 const TYPE_OPTIONS = ["내용이해", "추론", "표현분석", "어휘문법", "비판적사고", "적용", "서술형"];
 
@@ -76,7 +107,9 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
   }
 
   async function saveAll() {
-    const finalQuestions = states.filter(s => !s.excluded).map(s => s.q);
+    const finalQuestions = states
+      .filter(s => !s.excluded)
+      .map((s, idx) => ({ ...s.q, question_number: idx + 1 }));
     if (finalQuestions.length === 0) { setError("채택된 문항이 없습니다."); return; }
     setSaving(true);
     setError("");
@@ -135,7 +168,7 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
               passageText: questionSet.source_passages?.passage_text,
               passageImageUrls: questionSet.source_passages?.image_urls,
               keyPoints: questionSet.source_passages?.key_points,
-              questions: states.filter(s => !s.excluded).map(s => s.q),
+              questions: states.filter(s => !s.excluded).map((s, idx) => ({ ...s.q, question_number: idx + 1 })),
               createdAt: questionSet.created_at,
             } satisfies PdfData} />
           )}
@@ -210,6 +243,14 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
             )}
           </div>
         </div>
+
+        {/* 지문 */}
+        {questionSet.source_passages?.passage_text && (
+          <PassageCard
+            title={questionSet.source_passages.title}
+            text={questionSet.source_passages.passage_text}
+          />
+        )}
 
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>

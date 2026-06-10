@@ -1,32 +1,29 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabase } from "@/lib/supabase-server";
-import { CandidateQuestionPoint } from "@/types/passages";
+import { NextRequest, NextResponse } from 'next/server';
+import { getDb, parseJSON, stringifyJSON } from '@/lib/db';
+import { randomUUID } from 'crypto';
+import type { CandidateQuestionPoint } from '@/types/passages';
+
+function parsePassageRow(row: Record<string, unknown>) {
+  return {
+    ...row,
+    candidate_question_points: parseJSON(row.candidate_question_points as string, []),
+    image_urls: parseJSON(row.image_urls as string, []),
+  };
+}
 
 export async function GET() {
   try {
-    const supabase = await createServerSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
-
-    const { data, error } = await supabase
-      .from("source_passages")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-
-    if (error) throw error;
-    return NextResponse.json({ passages: data ?? [] });
+    const db = getDb();
+    const rows = db.prepare('SELECT * FROM source_passages ORDER BY created_at DESC').all() as Record<string, unknown>[];
+    return NextResponse.json({ passages: rows.map(parsePassageRow) });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "조회 실패" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : '조회 실패' }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
-
+    const db = getDb();
     const body = await request.json();
     const {
       title, area, source_type, passage_text, ocr_raw_text,
@@ -40,29 +37,30 @@ export async function POST(request: NextRequest) {
     } = body;
 
     if (!title?.trim()) {
-      return NextResponse.json({ error: "제목을 입력하세요." }, { status: 400 });
+      return NextResponse.json({ error: '제목을 입력하세요.' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from("source_passages")
-      .insert({
-        user_id: user.id,
-        title: title.trim(),
-        area: area ?? "",
-        source_type: source_type ?? "",
-        passage_text: passage_text ?? "",
-        ocr_raw_text: ocr_raw_text ?? "",
-        analysis_summary: analysis_summary ?? "",
-        key_points: key_points ?? "",
-        candidate_question_points: candidate_question_points ?? [],
-        image_urls: image_urls ?? [],
-      })
-      .select()
-      .single();
+    const id = randomUUID();
+    db.prepare(`
+      INSERT INTO source_passages
+        (id, title, area, source_type, passage_text, ocr_raw_text,
+         analysis_summary, key_points, candidate_question_points, image_urls)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      title.trim(),
+      area ?? '',
+      source_type ?? '',
+      passage_text ?? '',
+      ocr_raw_text ?? '',
+      analysis_summary ?? '',
+      key_points ?? '',
+      stringifyJSON(candidate_question_points ?? []),
+      stringifyJSON(image_urls ?? []),
+    );
 
-    if (error) throw error;
-    return NextResponse.json({ id: data.id });
+    return NextResponse.json({ id });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "저장 실패" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : '저장 실패' }, { status: 500 });
   }
 }

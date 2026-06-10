@@ -5,6 +5,39 @@ import { useSearchParams } from "next/navigation";
 import { ExamPatternSet } from "@/types/patterns";
 import { SourcePassage } from "@/types/passages";
 import { PatternBasedQuestion } from "@/types/pattern-remix";
+import JobRunner from "@/components/JobRunner";
+import type { Job } from "@/types/jobs";
+
+function PassageCard({ title, text }: { title?: string; text: string }) {
+  const [open, setOpen] = useState(false);
+  const preview = text.slice(0, 100) + (text.length > 100 ? "…" : "");
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden mb-3">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-amber-100/50 transition"
+      >
+        <span className="text-xs font-semibold text-amber-800">
+          지문{title ? ` — ${title}` : ""}
+        </span>
+        <svg
+          className={`w-3.5 h-3.5 text-amber-600 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {!open && (
+        <p className="px-3 pb-2.5 text-xs text-amber-700 leading-relaxed">{preview}</p>
+      )}
+      {open && (
+        <div className="px-3 pb-3">
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{text}</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const DIFF_OPTIONS = ["기본", "응용", "고난도"];
 const TYPE_OPTIONS = ["내용이해", "추론", "표현분석", "어휘문법", "비판적사고", "적용", "서술형"];
@@ -263,6 +296,12 @@ function GeneratePageInner() {
   const [selectedPattern, setSelectedPattern] = useState<ExamPatternSet | null>(null);
   const [selectedPassage, setSelectedPassage] = useState<SourcePassage | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [generateJobId, setGenerateJobId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('generateJobId');
+  });
+  const [generateJobDone, setGenerateJobDone] = useState(false);
+  const [sourceJobId, setSourceJobId] = useState<string | null>(null);
   const [editables, setEditables] = useState<EditableQuestion[]>([]);
   const [saveTitle, setSaveTitle] = useState("");
   const [saving, setSaving] = useState(false);
@@ -319,12 +358,15 @@ function GeneratePageInner() {
       return;
     }
     setError("");
-    setGenerating(true);
     setEditables([]);
     setSavedId(null);
+    setGenerateJobId(null);
+    setGenerateJobDone(false);
+    setSourceJobId(null);
     setSaveTitle(`${selectedPassage.title} × ${selectedPattern.title}`);
+    setGenerating(true);
     try {
-      const res = await fetch("/api/pattern-remix/generate", {
+      const res = await fetch("/api/pattern-remix/generate-job", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -333,19 +375,31 @@ function GeneratePageInner() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setEditables(toEditables(data.questions ?? []));
+      if (!res.ok) throw new Error(data.error ?? "문제 생성 job 시작 실패");
+      setGenerateJobId(data.jobId);
+      localStorage.setItem("generateJobId", data.jobId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "생성 중 오류 발생");
+      setError(e instanceof Error ? e.message : "생성 시작 실패");
     } finally {
       setGenerating(false);
     }
   }
 
+  function handleGenerateJobComplete(job: Job) {
+    const result = job.result as { questions?: PatternBasedQuestion[] } | null;
+    if (!result?.questions) return;
+    setEditables(toEditables(result.questions));
+    setGenerateJobDone(true);
+    setSourceJobId(job.id);
+    localStorage.removeItem("generateJobId");
+  }
+
   async function save() {
     if (!saveTitle.trim()) { setError("제목을 입력하세요."); return; }
     if (!selectedPattern || !selectedPassage) return;
-    const finalQuestions = editables.filter(e => !e.excluded).map(e => e.draft);
+    const finalQuestions = editables
+      .filter(e => !e.excluded)
+      .map((e, idx) => ({ ...e.draft, question_number: idx + 1 }));
     if (finalQuestions.length === 0) { setError("채택된 문항이 없습니다."); return; }
     setSaving(true);
     setError("");
@@ -360,6 +414,7 @@ function GeneratePageInner() {
           generated_questions: finalQuestions,
           difficulty: "",
           area: selectedPassage.area ?? "",
+          source_job_id: sourceJobId,
         }),
       });
       const data = await res.json();
@@ -475,10 +530,10 @@ function GeneratePageInner() {
             </div>
             <button
               onClick={generate}
-              disabled={generating || !selectedPattern || !selectedPassage || !selectedPassageHasText}
+              disabled={generating || (!!generateJobId && !generateJobDone) || !selectedPattern || !selectedPassage || !selectedPassageHasText}
               className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg font-medium hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
-              {generating ? "생성 중…" : editables.length > 0 ? "재생성" : "문제 생성"}
+              {generating ? "시작 중…" : editables.length > 0 || generateJobDone ? "재생성" : "문제 생성"}
             </button>
           </div>
 
@@ -497,9 +552,28 @@ function GeneratePageInner() {
 
           <div className="flex-1 overflow-y-auto p-4">
             {generating && (
-              <div className="flex flex-col items-center justify-center h-64 gap-3">
-                <div className="w-8 h-8 border-4 border-purple-300 border-t-purple-600 rounded-full animate-spin" />
-                <p className="text-gray-500 text-sm">Claude Opus로 문제 생성 중… (약 30~60초)</p>
+              <div className="flex flex-col items-center justify-center h-32 gap-3">
+                <div className="w-6 h-6 border-4 border-purple-300 border-t-purple-600 rounded-full animate-spin" />
+                <p className="text-gray-500 text-sm">문제 생성 job 시작 중…</p>
+              </div>
+            )}
+
+            {generateJobId && !generateJobDone && !generating && (
+              <div className="py-6 space-y-3">
+                <p className="text-sm font-medium text-purple-700 text-center">문제 생성 중 (Job)…</p>
+                <JobRunner jobId={generateJobId} onComplete={handleGenerateJobComplete} />
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => {
+                      setGenerateJobId(null);
+                      setGenerateJobDone(false);
+                      localStorage.removeItem("generateJobId");
+                    }}
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    취소
+                  </button>
+                </div>
               </div>
             )}
 
@@ -508,6 +582,10 @@ function GeneratePageInner() {
                 <p>패턴 세트와 지문을 선택하고</p>
                 <p>「문제 생성」을 클릭하세요</p>
               </div>
+            )}
+
+            {editables.length > 0 && selectedPassage?.passage_text && (
+              <PassageCard title={selectedPassage.title} text={selectedPassage.passage_text} />
             )}
 
             {editables.length > 0 && (
@@ -554,7 +632,7 @@ function GeneratePageInner() {
                     저장된 문제 목록
                   </Link>
                   <button
-                    onClick={() => { setEditables([]); setSavedId(null); setSelectedPattern(null); setSelectedPassage(null); }}
+                    onClick={() => { setEditables([]); setSavedId(null); setSelectedPattern(null); setSelectedPassage(null); setGenerateJobId(null); setGenerateJobDone(false); localStorage.removeItem("generateJobId"); }}
                     className="text-sm text-gray-600 border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50"
                   >
                     새로 생성

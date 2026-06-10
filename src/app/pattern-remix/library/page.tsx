@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import AuthUserMenu from "@/components/AuthUserMenu";
 import { ExamPatternSet } from "@/types/patterns";
 
 const AREA_BADGE: Record<string, string> = {
@@ -71,7 +70,6 @@ export default function PatternLibraryPage() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
               문제은행
             </Link>
-            <AuthUserMenu />
           </div>
         </div>
       </header>
