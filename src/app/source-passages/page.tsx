@@ -214,16 +214,16 @@ export default function SourcePassagesPage() {
             홈
           </Link>
           <div>
-            <h1 className="text-lg font-bold text-gray-900">새 지문 등록</h1>
-            <p className="text-xs text-gray-500 -mt-0.5">교과서·문학·독서 지문 등록 및 출제 요소 분석</p>
+            <h1 className="text-base font-bold text-gray-900">2단계 — 새 지문 넣기</h1>
+            <p className="text-xs text-gray-400 mt-0.5">사진 또는 텍스트로 지문을 등록합니다</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <Link href="/source-passages/library"
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-teal-600 bg-teal-50 hover:bg-teal-100 transition-colors">
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 transition-colors">
               지문 라이브러리
             </Link>
             <Link href="/pattern-remix/generate"
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 transition-colors">
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-green-600 hover:bg-green-700 transition-colors">
               문제 생성 →
             </Link>
           </div>
@@ -237,7 +237,7 @@ export default function SourcePassagesPage() {
             <span className="text-green-700 text-sm font-medium">지문이 저장되었습니다.</span>
             <div className="flex gap-2 flex-wrap">
               <Link href="/pattern-remix/generate"
-                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 transition-colors">
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-green-600 hover:bg-green-700 transition-colors">
                 다음: 문제 생성 →
               </Link>
               <Link href="/source-passages/library"
@@ -263,7 +263,7 @@ export default function SourcePassagesPage() {
             {(["image", "text"] as InputMode[]).map(m => (
               <button key={m} onClick={() => setMode(m)}
                 className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors ${
-                  mode === m ? "bg-teal-600 text-white" : "text-gray-500 hover:text-gray-700"
+                  mode === m ? "bg-green-600 text-white" : "text-gray-500 hover:text-gray-700"
                 }`}>
                 {m === "image" ? "📷 이미지 업로드" : "⌨ 텍스트 직접 입력"}
               </button>
@@ -275,13 +275,13 @@ export default function SourcePassagesPage() {
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col gap-3">
               <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
                 <div className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${
-                  ocrDone ? "bg-green-500 text-white" : "bg-teal-600 text-white"
+                  ocrDone ? "bg-green-500 text-white" : "bg-green-600 text-white"
                 }`}>
                   {ocrDone
                     ? <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
                     : 1}
                 </div>
-                <p className={`text-sm font-bold ${ocrDone ? "text-green-700" : "text-teal-700"}`}>
+                <p className={`text-sm font-bold ${ocrDone ? "text-green-700" : "text-green-700"}`}>
                   지문 이미지 업로드 {ocrDone && <span className="font-normal text-green-600">· OCR 완료</span>}
                 </p>
               </div>
@@ -292,7 +292,7 @@ export default function SourcePassagesPage() {
                   onDrop={handleDrop}
                   onDragOver={e => e.preventDefault()}
                   onClick={() => document.getElementById("passage-file-input")?.click()}
-                  className="border-2 border-dashed border-gray-200 rounded-xl p-6 flex flex-col items-center gap-2 text-center hover:border-teal-300 hover:bg-teal-50/30 transition-colors cursor-pointer">
+                  className="border-2 border-dashed border-gray-200 rounded-xl p-6 flex flex-col items-center gap-2 text-center hover:border-green-300 hover:bg-green-50/30 transition-colors cursor-pointer">
                   <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                   </svg>
@@ -338,7 +338,7 @@ export default function SourcePassagesPage() {
                   ))}
                   <button
                     onClick={() => document.getElementById("passage-file-input")?.click()}
-                    className="flex items-center justify-center gap-1 py-2 rounded-xl border-2 border-dashed border-gray-200 text-xs text-gray-400 hover:border-teal-300 hover:text-teal-500 transition-colors"
+                    className="flex items-center justify-center gap-1 py-2 rounded-xl border-2 border-dashed border-gray-200 text-xs text-gray-400 hover:border-green-300 hover:text-green-500 transition-colors"
                   >+ 이미지 추가</button>
                 </div>
               )}
@@ -350,7 +350,7 @@ export default function SourcePassagesPage() {
                   images.length > 0 && !ocrLoading
                     ? ocrDone
                       ? "bg-green-100 text-green-700 border border-green-300 hover:bg-green-200"
-                      : "bg-teal-600 text-white hover:bg-teal-700 shadow-sm"
+                      : "bg-green-600 text-white hover:bg-green-700 shadow-sm"
                     : "bg-gray-100 text-gray-400 cursor-not-allowed"
                 }`}>
                 {ocrLoading ? <><Spinner /> OCR 실행 중…</> : ocrDone ? "OCR 재실행" : "OCR 실행"}
@@ -363,9 +363,9 @@ export default function SourcePassagesPage() {
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <div className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${
-                  passageText.trim() ? "bg-teal-600 text-white" : "bg-gray-200 text-gray-400"
+                  passageText.trim() ? "bg-green-600 text-white" : "bg-gray-200 text-gray-400"
                 }`}>{mode === "image" ? 2 : 1}</div>
-                <p className={`text-sm font-bold ${passageText.trim() ? "text-teal-700" : "text-gray-400"}`}>지문 내용</p>
+                <p className={`text-sm font-bold ${passageText.trim() ? "text-green-700" : "text-gray-400"}`}>지문 내용</p>
               </div>
               {passageText && <span className="text-xs text-gray-400">{passageText.length.toLocaleString()}자</span>}
             </div>
@@ -378,7 +378,7 @@ export default function SourcePassagesPage() {
                   ? "위에서 OCR을 실행하면 텍스트가 여기에 표시됩니다.\n직접 수정도 가능합니다."
                   : "지문을 직접 입력하거나 붙여넣으세요."
               }
-              className="flex-1 w-full resize-none border border-gray-200 rounded-xl p-3 text-sm text-gray-800 placeholder:text-gray-400 leading-relaxed focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 min-h-[200px]"
+              className="flex-1 w-full resize-none border border-gray-200 rounded-xl p-3 text-sm text-gray-800 placeholder:text-gray-400 leading-relaxed focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100 min-h-[200px]"
             />
 
             {/* 지문 분석 버튼 — 텍스트 바로 아래 */}
@@ -388,7 +388,7 @@ export default function SourcePassagesPage() {
                 disabled={!passageText.trim() || analyzing}
                 className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold transition-all ${
                   passageText.trim() && !analyzing
-                    ? "bg-teal-600 text-white hover:bg-teal-700 shadow-md ring-2 ring-teal-300 ring-offset-1"
+                    ? "bg-green-600 text-white hover:bg-green-700 shadow-md ring-2 ring-green-300 ring-offset-1"
                     : "bg-gray-100 text-gray-400 cursor-not-allowed"
                 }`}>
                 {analyzing
@@ -399,10 +399,10 @@ export default function SourcePassagesPage() {
                     </svg>
                     지문 분석 시작
                     {passageText.trim() && passageText.length > PASSAGE_SYNC_LIMIT && (
-                      <span className="ml-1 text-teal-200 font-normal text-xs">(장문 — Job 분석)</span>
+                      <span className="ml-1 text-green-200 font-normal text-xs">(장문 — Job 분석)</span>
                     )}
                     {passageText.trim() && passageText.length <= PASSAGE_SYNC_LIMIT && (
-                      <span className="ml-1 text-teal-200 font-normal text-xs">(출제 요소 자동 추출)</span>
+                      <span className="ml-1 text-green-200 font-normal text-xs">(출제 요소 자동 추출)</span>
                     )}
                   </>
                 }
@@ -412,7 +412,7 @@ export default function SourcePassagesPage() {
             {/* Job 기반 분석 진행 (>3000자) */}
             {passageJobId && !passageJobDone && (
               <div className="flex flex-col gap-2">
-                <p className="text-xs text-teal-600">장문 지문 분석 중 (Job)…</p>
+                <p className="text-xs text-green-600">장문 지문 분석 중 (Job)…</p>
                 <JobRunner jobId={passageJobId} onComplete={handleJobComplete} />
                 <button onClick={() => { setPassageJobId(null); setPassageJobDone(false); }}
                   className="text-xs text-gray-400 hover:text-gray-600 underline self-start">취소</button>
@@ -428,7 +428,7 @@ export default function SourcePassagesPage() {
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col gap-4">
             <p className="text-sm font-bold text-gray-800">지문 정보</p>
             <div>
-              <label className={LABEL_CLS}>제목 <span className="text-teal-500">*</span></label>
+              <label className={LABEL_CLS}>제목 <span className="text-green-500">*</span></label>
               <input value={title} onChange={e => { setTitle(e.target.value); setError(""); }}
                 placeholder="예: 김소월 - 진달래꽃 / 기후 변화와 생태계"
                 className={INPUT_CLS + (error && !title ? " border-red-400" : "")} />
@@ -455,7 +455,7 @@ export default function SourcePassagesPage() {
           {/* 로딩 */}
           {analyzing && (
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-10 flex flex-col items-center gap-3">
-              <svg className="w-10 h-10 animate-spin text-teal-500" fill="none" viewBox="0 0 24 24">
+              <svg className="w-10 h-10 animate-spin text-green-500" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
@@ -477,9 +477,9 @@ export default function SourcePassagesPage() {
                   <p className="text-xs font-semibold text-gray-500 mb-1">요약</p>
                   <p className="text-sm text-gray-700 leading-relaxed">{analysisSummary}</p>
                 </div>
-                <div className="bg-teal-50 border border-teal-100 rounded-xl p-3">
-                  <p className="text-xs font-semibold text-teal-600 mb-1">핵심 내용</p>
-                  <p className="text-sm text-teal-800 leading-relaxed whitespace-pre-wrap">{keyPoints}</p>
+                <div className="bg-green-50 border border-green-100 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-green-600 mb-1">핵심 내용</p>
+                  <p className="text-sm text-green-800 leading-relaxed whitespace-pre-wrap">{keyPoints}</p>
                 </div>
               </div>
 
@@ -489,7 +489,7 @@ export default function SourcePassagesPage() {
                   {candidatePoints.map((pt, i) => (
                     <div key={i} className="bg-gray-50 rounded-xl p-3 flex flex-col gap-1.5">
                       <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-700 text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                        <span className="w-5 h-5 rounded-full bg-green-100 text-green-700 text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
                         <span className="text-sm font-semibold text-gray-800">{pt.element}</span>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${QTYPE_BADGE[pt.question_type] ?? "bg-gray-100 text-gray-600"}`}>{pt.question_type}</span>
                       </div>
@@ -504,8 +504,8 @@ export default function SourcePassagesPage() {
           {/* 빈 상태 */}
           {!passageText && !analyzing && (
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-10 flex flex-col items-center justify-center gap-3 flex-1">
-              <div className="w-14 h-14 rounded-full bg-teal-50 flex items-center justify-center">
-                <svg className="w-7 h-7 text-teal-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center">
+                <svg className="w-7 h-7 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>
               </div>
@@ -524,7 +524,7 @@ export default function SourcePassagesPage() {
                 ? <p className="text-sm font-semibold text-gray-800 truncate">「{title}」 저장 준비 완료</p>
                 : <p className="text-sm text-gray-400">제목을 입력하면 저장할 수 있습니다 (오른쪽 패널)</p>
               }
-              {analysisReady && <p className="text-xs text-teal-600 mt-0.5">분석 완료 · 출제 요소 {candidatePoints.length}개</p>}
+              {analysisReady && <p className="text-xs text-green-600 mt-0.5">분석 완료 · 출제 요소 {candidatePoints.length}개</p>}
             </div>
             {error && <p className="text-xs text-red-500 flex-shrink-0">{error}</p>}
             <button
