@@ -37,33 +37,18 @@ function toPdfData(s: PatternBasedQuestionSet): PdfData {
   };
 }
 
-const VIS_BADGE: Record<string, { label: string; cls: string }> = {
-  private: { label: "🔒 비공개", cls: "bg-gray-100 text-gray-500" },
-  link_only: { label: "🔗 링크 공유", cls: "bg-green-100 text-green-700" },
-  neighbors: { label: "👥 서로이웃", cls: "bg-purple-100 text-purple-700" },
-  public: { label: "🌍 공개", cls: "bg-green-100 text-green-700" },
-};
-
 export default function PBQLibraryPage() {
   const [sets, setSets] = useState<PatternBasedQuestionSet[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [expandedQ, setExpandedQ] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/pattern-based-questions")
       .then(r => r.json())
       .then(d => { setSets(d.questionSets ?? []); setLoading(false); });
   }, []);
-
-  function copyShareLink(s: PatternBasedQuestionSet) {
-    const url = `${window.location.origin}/share/${s.share_token}`;
-    navigator.clipboard.writeText(url);
-    setCopiedId(s.id);
-    setTimeout(() => setCopiedId(null), 2000);
-  }
 
   async function del(id: string) {
     if (!confirm("이 문제 세트를 삭제하시겠습니까?")) return;
@@ -77,7 +62,7 @@ export default function PBQLibraryPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-purple-300 border-t-purple-600 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-green-200 border-t-green-600 rounded-full animate-spin" />
       </div>
     );
   }
@@ -103,7 +88,7 @@ export default function PBQLibraryPage() {
         {sets.length === 0 ? (
           <div className="bg-white rounded-xl border p-12 text-center text-gray-400">
             <p className="text-lg mb-2">저장된 문제 세트 없음</p>
-            <Link href="/pattern-remix/generate" className="text-purple-600 hover:underline text-sm">
+            <Link href="/pattern-remix/generate" className="text-green-600 hover:underline text-sm">
               문제 생성하러 가기
             </Link>
           </div>
@@ -114,17 +99,12 @@ export default function PBQLibraryPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-semibold text-gray-900">{s.title}</h3>
-                  {s.visibility && VIS_BADGE[s.visibility] && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${VIS_BADGE[s.visibility].cls}`}>
-                      {VIS_BADGE[s.visibility].label}
-                    </span>
-                  )}
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
-                  <span className="text-xs text-purple-600">
+                  <span className="text-xs text-green-600">
                     패턴: {s.exam_pattern_sets?.title ?? s.pattern_set_id}
                   </span>
-                  <span className="text-xs text-teal-600">
+                  <span className="text-xs text-green-600">
                     지문: {s.source_passages?.title ?? s.source_passage_id}
                   </span>
                   {s.area && <span className="text-xs text-gray-500">영역: {s.area}</span>}
@@ -140,17 +120,9 @@ export default function PBQLibraryPage() {
                 </div>
               </div>
               <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-                {(s.visibility === 'link_only' || s.visibility === 'neighbors' || s.visibility === 'public') && s.share_token && (
-                  <button
-                    onClick={() => copyShareLink(s)}
-                    className="text-sm text-green-600 border border-green-200 px-3 py-1.5 rounded hover:bg-green-50"
-                  >
-                    {copiedId === s.id ? "복사됨 ✓" : "링크 복사"}
-                  </button>
-                )}
                 <button
                   onClick={() => { setExpanded(expanded === s.id ? null : s.id); setExpandedQ(null); }}
-                  className="text-sm text-purple-600 border border-purple-200 px-3 py-1.5 rounded hover:bg-purple-50"
+                  className="text-sm text-green-600 border border-green-200 px-3 py-1.5 rounded hover:bg-green-50"
                 >
                   {expanded === s.id ? "접기" : "문제 보기"}
                 </button>
@@ -195,7 +167,7 @@ export default function PBQLibraryPage() {
                           </div>
                           <p className="text-sm text-gray-900 leading-snug">{q.question_text}</p>
                           {q.pattern_reference && (
-                            <p className="text-xs text-purple-500 mt-0.5">패턴 참조: {q.pattern_reference}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">패턴 참조: {q.pattern_reference}</p>
                           )}
                         </div>
                         <span className="text-gray-400 text-xs shrink-0">{expandedQ === i ? "▲" : "▼"}</span>
