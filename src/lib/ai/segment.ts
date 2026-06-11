@@ -44,7 +44,7 @@ const SEGMENT_MAX_GROUPS = 12;
 export async function runSegmentChunk(allOcrText: string): Promise<SegmentResult> {
   try {
     const response = await client.messages.parse({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 2048,
       system: '당신은 국어 시험지 OCR 텍스트를 지문 그룹으로 분할하는 전문가입니다.',
       messages: [{
@@ -70,7 +70,7 @@ ${allOcrText}`,
     const rawGroups = parsed?.groups?.slice(0, SEGMENT_MAX_GROUPS) ?? [];
 
     const usage = {
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       input_tokens: response.usage.input_tokens,
       output_tokens: response.usage.output_tokens,
     };
@@ -97,7 +97,7 @@ ${allOcrText}`,
     console.warn('[segment] parse failed, falling back to single group:', err instanceof Error ? err.message : err);
     return {
       groups: [{ label: '', text: allOcrText }],
-      usage: { model: 'claude-sonnet-4-6', input_tokens: 0, output_tokens: 0 },
+      usage: { model: 'claude-haiku-4-5-20251001', input_tokens: 0, output_tokens: 0 },
     };
   }
 }

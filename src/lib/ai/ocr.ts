@@ -40,7 +40,7 @@ export async function runOcrChunk(localImagePath: string): Promise<OcrResult> {
   const mediaType = mediaTypeFromPath(absPath);
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 8192,
     system: `당신은 한국어 시험지 이미지 전문 OCR 엔진입니다.
 현대 한국어뿐 아니라 고어·옛표기(ㆍ아래아, ㆎ, ㅸ순경음비읍, ㆁ옛이응, ㅿ반치음 등)도 정확히 인식합니다.
@@ -88,7 +88,7 @@ export async function runOcrChunk(localImagePath: string): Promise<OcrResult> {
   return {
     output: { text },
     usage: {
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       input_tokens: response.usage.input_tokens,
       output_tokens: response.usage.output_tokens,
     },

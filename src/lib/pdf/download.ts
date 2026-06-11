@@ -95,29 +95,32 @@ export async function downloadPdf(data: PdfData, mode: PdfMode) {
     el.innerHTML = html;
     document.body.appendChild(el);
 
-    // 폰트 로딩 + 레이아웃 완성까지 충분히 대기
-    await new Promise(r => requestAnimationFrame(r));
-    await new Promise(r => setTimeout(r, 150));
+    try {
+      // 폰트 로딩 + 레이아웃 완성까지 충분히 대기
+      await new Promise(r => requestAnimationFrame(r));
+      await new Promise(r => setTimeout(r, 150));
 
-    // 전체 높이를 명시적으로 측정 — 이 값을 html2canvas에 전달해야
-    // 긴 지문이 viewport 높이에서 잘리지 않고 완전히 캡처됨
-    const elH = el.scrollHeight;
+      // 전체 높이를 명시적으로 측정 — 이 값을 html2canvas에 전달해야
+      // 긴 지문이 viewport 높이에서 잘리지 않고 완전히 캡처됨
+      const elH = el.scrollHeight;
 
-    const canvas = await html2canvas(el, {
-      scale: SCALE,
-      useCORS: true,
-      logging: false,
-      width:        containerW,
-      height:       elH,          // 전체 높이 명시 (기본값은 viewport 높이)
-      windowWidth:  containerW,
-      windowHeight: elH,          // html2canvas 내부 뷰포트도 동일하게 설정
-      scrollX: 0,
-      scrollY: 0,
-      backgroundColor: "#ffffff",
-    });
+      const canvas = await html2canvas(el, {
+        scale: SCALE,
+        useCORS: true,
+        logging: false,
+        width:        containerW,
+        height:       elH,          // 전체 높이 명시 (기본값은 viewport 높이)
+        windowWidth:  containerW,
+        windowHeight: elH,          // html2canvas 내부 뷰포트도 동일하게 설정
+        scrollX: 0,
+        scrollY: 0,
+        backgroundColor: "#ffffff",
+      });
 
-    document.body.removeChild(el);
-    return canvas;
+      return canvas;
+    } finally {
+      document.body.removeChild(el);
+    }
   }
 
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });

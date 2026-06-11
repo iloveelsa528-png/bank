@@ -40,17 +40,23 @@ interface EditableQuestion {
 // ── 단계 표시 바 ────────────────────────────────────────────────────────────
 function StepBar({
   current,
-  pattern,
+  patterns,
   passage,
   onStep,
 }: {
   current: WizardStep;
-  pattern: ExamPatternSet | null;
+  patterns: ExamPatternSet[];
   passage: SourcePassage | null;
   onStep: (s: WizardStep) => void;
 }) {
+  const patternLabel = patterns.length === 0
+    ? "기출 패턴 선택"
+    : patterns.length === 1
+      ? patterns[0].title
+      : `패턴 ${patterns.length}개 선택`;
+
   const steps: { n: WizardStep; label: string; done: boolean }[] = [
-    { n: 1, label: pattern ? pattern.title : "기출 패턴 선택", done: !!pattern },
+    { n: 1, label: patternLabel, done: patterns.length > 0 },
     { n: 2, label: passage ? passage.title : "지문 선택", done: !!passage },
     { n: 3, label: "문제 생성", done: false },
   ];
@@ -88,23 +94,27 @@ function StepBar({
   );
 }
 
-// ── 패턴 세트 선택 (1단계) ───────────────────────────────────────────────────
+// ── 패턴 세트 선택 (1단계) — 다중 선택 ──────────────────────────────────────
 function PatternStep({
   patterns,
   selected,
   loading,
-  onSelect,
+  onToggle,
+  onConfirm,
 }: {
   patterns: ExamPatternSet[];
-  selected: ExamPatternSet | null;
+  selected: ExamPatternSet[];
   loading: boolean;
-  onSelect: (p: ExamPatternSet) => void;
+  onToggle: (p: ExamPatternSet) => void;
+  onConfirm: () => void;
 }) {
+  const selectedIds = new Set(selected.map(p => p.id));
+
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
+    <div className="max-w-3xl mx-auto px-4 py-6 pb-32">
       <div className="mb-5">
         <h2 className="text-lg font-bold text-gray-900">기출 패턴을 선택하세요</h2>
-        <p className="text-sm text-gray-500 mt-1">분석해 놓은 기출 시험지의 문항 패턴입니다. 이 패턴을 새 지문에 적용합니다.</p>
+        <p className="text-sm text-gray-500 mt-1">여러 개 선택 가능 — 선택한 패턴을 모두 합쳐 문제를 만듭니다.</p>
       </div>
 
       {loading ? (
@@ -125,41 +135,74 @@ function PatternStep({
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {patterns.map(ps => (
-            <button
-              key={ps.id}
-              onClick={() => onSelect(ps)}
-              className={`text-left p-4 rounded-2xl border-2 transition-all hover:shadow-md active:scale-[0.98] ${
-                selected?.id === ps.id
-                  ? "border-green-500 bg-green-50"
-                  : "border-gray-200 bg-white hover:border-green-300"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <p className="font-semibold text-gray-900 leading-snug">{ps.title}</p>
-                {selected?.id === ps.id && (
-                  <span className="text-green-600 text-lg flex-shrink-0">✓</span>
-                )}
-              </div>
-              <p className="text-xs text-gray-500">
-                {[ps.school_name, ps.grade, ps.exam_name].filter(Boolean).join(" · ")}
-              </p>
-              <p className="text-xs font-medium text-green-600 mt-2">
-                문항 패턴 {ps.exam_patterns?.length ?? 0}개
-              </p>
-              {selected?.id !== ps.id && (
-                <p className="text-xs text-green-700 font-semibold mt-3">이 패턴 사용하기 →</p>
-              )}
-            </button>
-          ))}
+          {patterns.map(ps => {
+            const isSelected = selectedIds.has(ps.id);
+            return (
+              <button
+                key={ps.id}
+                onClick={() => onToggle(ps)}
+                className={`text-left p-4 rounded-2xl border-2 transition-all hover:shadow-md active:scale-[0.98] ${
+                  isSelected
+                    ? "border-green-500 bg-green-50"
+                    : "border-gray-200 bg-white hover:border-green-300"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+                    isSelected ? "border-green-500 bg-green-500" : "border-gray-300 bg-white"
+                  }`}>
+                    {isSelected && (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 leading-snug">{ps.title}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {[ps.school_name, ps.grade, ps.exam_name].filter(Boolean).join(" · ")}
+                    </p>
+                    <p className="text-xs font-medium text-green-600 mt-1.5">
+                      문항 패턴 {ps.exam_patterns?.length ?? 0}개
+                    </p>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
           {/* 추가하기 카드 */}
           <Link
             href="/pattern-remix"
-            className="text-left p-4 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 hover:border-green-300 hover:bg-green-50 transition-all flex flex-col items-center justify-center gap-2 min-h-[120px]"
+            className="text-left p-4 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 hover:border-green-300 hover:bg-green-50 transition-all flex flex-col items-center justify-center gap-2 min-h-[100px]"
           >
             <span className="text-2xl">+</span>
             <span className="text-sm text-gray-500 text-center">기출 시험지 더 분석하기</span>
           </Link>
+        </div>
+      )}
+
+      {/* 다음 단계 버튼 — 선택이 있을 때만 표시 */}
+      {selected.length > 0 && (
+        <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-[60]">
+          <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+            <p className="text-sm text-gray-600">
+              <span className="font-bold text-green-700">{selected.length}개</span> 패턴 선택됨
+              {" · "}총{" "}
+              <span className="font-semibold">
+                {selected.reduce((s, p) => s + (p.exam_patterns?.length ?? 0), 0)}
+              </span>
+              개 문항 패턴
+            </p>
+            <button
+              onClick={onConfirm}
+              className="flex items-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors shadow-md flex-shrink-0"
+            >
+              다음 단계
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -171,7 +214,7 @@ function PassageStep({
   passages,
   selected,
   loading,
-  selectedPattern,
+  selectedPatterns,
   onSelect,
   onBack,
   onRefresh,
@@ -179,7 +222,7 @@ function PassageStep({
   passages: SourcePassage[];
   selected: SourcePassage | null;
   loading: boolean;
-  selectedPattern: ExamPatternSet | null;
+  selectedPatterns: ExamPatternSet[];
   onSelect: (p: SourcePassage) => void;
   onBack: () => void;
   onRefresh: () => void;
@@ -187,11 +230,15 @@ function PassageStep({
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
       {/* 선택된 패턴 요약 */}
-      {selectedPattern && (
+      {selectedPatterns.length > 0 && (
         <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 mb-5">
           <span className="text-green-700 text-sm">✓ 패턴:</span>
-          <span className="text-sm font-semibold text-green-800">{selectedPattern.title}</span>
-          <button onClick={onBack} className="ml-auto text-xs text-green-600 hover:underline">변경</button>
+          <span className="text-sm font-semibold text-green-800 truncate">
+            {selectedPatterns.length === 1
+              ? selectedPatterns[0].title
+              : `${selectedPatterns[0].title} 외 ${selectedPatterns.length - 1}개`}
+          </span>
+          <button onClick={onBack} className="ml-auto text-xs text-green-600 hover:underline flex-shrink-0">변경</button>
         </div>
       )}
 
@@ -505,20 +552,23 @@ function QuestionCard({
 
 // ── 문제 생성 (3단계) ────────────────────────────────────────────────────────
 function GenerateStep({
-  selectedPattern,
+  selectedPatterns,
   selectedPassage,
   onBack,
 }: {
-  selectedPattern: ExamPatternSet;
+  selectedPatterns: ExamPatternSet[];
   selectedPassage: SourcePassage;
   onBack: () => void;
 }) {
+  const defaultTitle = () =>
+    `${selectedPassage.title} × ${selectedPatterns.map(p => p.title).join(', ')}`;
+
   const [generating, setGenerating] = useState(false);
   const [generateJobId, setGenerateJobId] = useState<string | null>(null);
   const [generateJobDone, setGenerateJobDone] = useState(false);
   const [sourceJobId, setSourceJobId] = useState<string | null>(null);
   const [editables, setEditables] = useState<EditableQuestion[]>([]);
-  const [saveTitle, setSaveTitle] = useState(`${selectedPassage.title} × ${selectedPattern.title}`);
+  const [saveTitle, setSaveTitle] = useState(defaultTitle);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -532,6 +582,7 @@ function GenerateStep({
   }
 
   async function generate() {
+    setSaveTitle(defaultTitle());
     setError("");
     setEditables([]);
     setSavedId(null);
@@ -544,7 +595,7 @@ function GenerateStep({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          pattern_set_id: selectedPattern.id,
+          pattern_set_ids: selectedPatterns.map(p => p.id),
           source_passage_id: selectedPassage.id,
         }),
       });
@@ -579,7 +630,7 @@ function GenerateStep({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: saveTitle.trim(),
-          pattern_set_id: selectedPattern.id,
+          pattern_set_id: selectedPatterns[0].id,
           source_passage_id: selectedPassage.id,
           generated_questions: finalQuestions,
           difficulty: "",
@@ -600,15 +651,20 @@ function GenerateStep({
   const adopted = editables.filter(e => !e.excluded).length;
   const reviewed = editables.filter(e => e.reviewed && !e.excluded).length;
   const isGenerating = generating || (!!generateJobId && !generateJobDone);
+  const totalPatternCount = selectedPatterns.reduce((s, p) => s + (p.exam_patterns?.length ?? 0), 0);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 pb-32">
       {/* 선택 요약 */}
       <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-5 space-y-2.5">
         <p className="text-sm font-bold text-gray-800 mb-3">선택 완료</p>
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg font-medium flex-shrink-0">기출 패턴</span>
-          <p className="text-sm font-medium text-gray-900">{selectedPattern.title}</p>
+          <div className="flex-1 min-w-0">
+            {selectedPatterns.map(p => (
+              <p key={p.id} className="text-sm font-medium text-gray-900 leading-snug">{p.title}</p>
+            ))}
+          </div>
           <button onClick={onBack} className="ml-auto text-xs text-gray-400 hover:text-gray-600 flex-shrink-0">변경</button>
         </div>
         <div className="flex items-center gap-3">
@@ -630,7 +686,7 @@ function GenerateStep({
             AI가 문제를 자동으로 만들어 드립니다
           </p>
           <p className="text-sm text-gray-400 mb-6">
-            {selectedPattern.exam_patterns?.length ?? 0}개의 기출 패턴을
+            {totalPatternCount}개의 기출 패턴을
             &ldquo;{selectedPassage.title}&rdquo;에 적용합니다
           </p>
           <button
@@ -658,7 +714,7 @@ function GenerateStep({
             <p className="text-sm font-semibold text-green-700">AI가 문제를 만드는 중입니다…</p>
           </div>
           <p className="text-xs text-gray-400">기출 패턴을 분석하여 새 지문에 맞는 문항을 생성합니다. 1~3분 정도 걸립니다.</p>
-          <JobRunner jobId={generateJobId} onComplete={handleJobComplete} />
+          <JobRunner key={generateJobId} jobId={generateJobId} onComplete={handleJobComplete} />
           <button
             onClick={() => { setGenerateJobId(null); setGenerateJobDone(false); }}
             className="text-xs text-gray-400 hover:text-gray-600"
@@ -772,10 +828,10 @@ function GenerateStep({
               large
               data={{
                 title: saveTitle,
-                school: selectedPattern.school_name,
-                grade: selectedPattern.grade,
+                school: selectedPatterns[0].school_name,
+                grade: selectedPatterns[0].grade,
                 area: selectedPassage.area,
-                patternSetTitle: selectedPattern.title,
+                patternSetTitle: selectedPatterns.map(p => p.title).join(', '),
                 passageTitle: selectedPassage.title,
                 passageText: selectedPassage.passage_text,
                 passageImageUrls: selectedPassage.image_urls,
@@ -806,6 +862,7 @@ function GenerateStep({
                 setSavedId(null);
                 setGenerateJobId(null);
                 setGenerateJobDone(false);
+                setSaveTitle(defaultTitle());
               }}
               className="px-4 py-2 border border-gray-200 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition-colors"
             >
@@ -826,7 +883,7 @@ function GeneratePageInner() {
   const [passages, setPassages] = useState<SourcePassage[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [selectedPattern, setSelectedPattern] = useState<ExamPatternSet | null>(null);
+  const [selectedPatterns, setSelectedPatterns] = useState<ExamPatternSet[]>([]);
   const [selectedPassage, setSelectedPassage] = useState<SourcePassage | null>(null);
 
   useEffect(() => {
@@ -843,15 +900,14 @@ function GeneratePageInner() {
       setPassages(loadedPassages);
 
       let step: WizardStep = 1;
-      let autoPattern: ExamPatternSet | null = null;
+      let autoPatterns: ExamPatternSet[] = [];
       let autoPassage: SourcePassage | null = null;
 
       if (prePattern) {
         const found = loadedPatterns.find(p => p.id === prePattern);
-        if (found) { autoPattern = found; step = 2; }
+        if (found) { autoPatterns = [found]; step = 2; }
       } else if (loadedPatterns.length === 1) {
-        // 패턴이 1개뿐이면 자동 선택
-        autoPattern = loadedPatterns[0];
+        autoPatterns = [loadedPatterns[0]];
         step = 2;
       }
 
@@ -859,12 +915,11 @@ function GeneratePageInner() {
         const found = loadedPassages.find(p => p.id === prePassage);
         if (found) { autoPassage = found; if (step === 2) step = 3; }
       } else if (loadedPassages.length === 1 && step === 2) {
-        // 지문이 1개뿐이면 자동 선택
         autoPassage = loadedPassages[0];
         step = 3;
       }
 
-      if (autoPattern) setSelectedPattern(autoPattern);
+      if (autoPatterns.length > 0) setSelectedPatterns(autoPatterns);
       if (autoPassage) setSelectedPassage(autoPassage);
       setWizardStep(step);
     }).catch(e => {
@@ -881,9 +936,16 @@ function GeneratePageInner() {
     }).catch(() => {});
   }
 
-  function handleSelectPattern(p: ExamPatternSet) {
-    setSelectedPattern(p);
-    setWizardStep(2);
+  function handleTogglePattern(p: ExamPatternSet) {
+    setSelectedPatterns(prev => {
+      const exists = prev.find(x => x.id === p.id);
+      if (exists) return prev.filter(x => x.id !== p.id);
+      return [...prev, p];
+    });
+  }
+
+  function handleConfirmPatterns() {
+    if (selectedPatterns.length > 0) setWizardStep(2);
   }
 
   function handleSelectPassage(p: SourcePassage) {
@@ -920,12 +982,12 @@ function GeneratePageInner() {
       {/* 단계 표시 바 */}
       <StepBar
         current={wizardStep}
-        pattern={selectedPattern}
+        patterns={selectedPatterns}
         passage={selectedPassage}
         onStep={(s) => {
           if (s === 1) setWizardStep(1);
-          else if (s === 2 && selectedPattern) setWizardStep(2);
-          else if (s === 3 && selectedPattern && selectedPassage) setWizardStep(3);
+          else if (s === 2 && selectedPatterns.length > 0) setWizardStep(2);
+          else if (s === 3 && selectedPatterns.length > 0 && selectedPassage) setWizardStep(3);
         }}
       />
 
@@ -939,9 +1001,10 @@ function GeneratePageInner() {
       {wizardStep === 1 && (
         <PatternStep
           patterns={patternSets}
-          selected={selectedPattern}
+          selected={selectedPatterns}
           loading={loading}
-          onSelect={handleSelectPattern}
+          onToggle={handleTogglePattern}
+          onConfirm={handleConfirmPatterns}
         />
       )}
 
@@ -950,16 +1013,16 @@ function GeneratePageInner() {
           passages={passages}
           selected={selectedPassage}
           loading={loading}
-          selectedPattern={selectedPattern}
+          selectedPatterns={selectedPatterns}
           onSelect={handleSelectPassage}
           onBack={() => setWizardStep(1)}
           onRefresh={refreshPassages}
         />
       )}
 
-      {wizardStep === 3 && selectedPattern && selectedPassage && (
+      {wizardStep === 3 && selectedPatterns.length > 0 && selectedPassage && (
         <GenerateStep
-          selectedPattern={selectedPattern}
+          selectedPatterns={selectedPatterns}
           selectedPassage={selectedPassage}
           onBack={() => setWizardStep(2)}
         />
