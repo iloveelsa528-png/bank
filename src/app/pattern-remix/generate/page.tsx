@@ -563,6 +563,8 @@ function GenerateStep({
   const defaultTitle = () =>
     `${selectedPassage.title} × ${selectedPatterns.map(p => p.title).join(', ')}`;
 
+  const totalPatternCount = selectedPatterns.reduce((s, p) => s + (p.exam_patterns?.length ?? 0), 0);
+
   const [generating, setGenerating] = useState(false);
   const [generateJobId, setGenerateJobId] = useState<string | null>(null);
   const [generateJobDone, setGenerateJobDone] = useState(false);
@@ -572,6 +574,7 @@ function GenerateStep({
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [questionCount, setQuestionCount] = useState(() => Math.max(1, totalPatternCount));
 
   function toEditables(qs: PatternBasedQuestion[]): EditableQuestion[] {
     return qs.map(q => ({ draft: q, excluded: false, reviewed: false, editing: false }));
@@ -597,6 +600,7 @@ function GenerateStep({
         body: JSON.stringify({
           pattern_set_ids: selectedPatterns.map(p => p.id),
           source_passage_id: selectedPassage.id,
+          question_count: questionCount,
         }),
       });
       const data = await res.json();
@@ -651,7 +655,6 @@ function GenerateStep({
   const adopted = editables.filter(e => !e.excluded).length;
   const reviewed = editables.filter(e => e.reviewed && !e.excluded).length;
   const isGenerating = generating || (!!generateJobId && !generateJobDone);
-  const totalPatternCount = selectedPatterns.reduce((s, p) => s + (p.exam_patterns?.length ?? 0), 0);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 pb-32">
@@ -680,21 +683,69 @@ function GenerateStep({
 
       {/* 초기 상태: 생성 버튼 */}
       {!isGenerating && editables.length === 0 && !savedId && (
-        <div className="text-center py-10 bg-white rounded-2xl border border-gray-200">
-          <p className="text-3xl mb-3">✨</p>
-          <p className="text-gray-700 font-semibold text-base mb-2">
-            AI가 문제를 자동으로 만들어 드립니다
-          </p>
-          <p className="text-sm text-gray-400 mb-6">
-            {totalPatternCount}개의 기출 패턴을
-            &ldquo;{selectedPassage.title}&rdquo;에 적용합니다
-          </p>
-          <button
-            onClick={generate}
-            className="inline-flex items-center gap-2 px-8 py-3.5 bg-green-600 text-white rounded-xl text-base font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-100"
-          >
-            문제 생성하기
-          </button>
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="text-center py-8 px-6">
+            <p className="text-3xl mb-3">✨</p>
+            <p className="text-gray-700 font-semibold text-base mb-1">
+              AI가 문제를 자동으로 만들어 드립니다
+            </p>
+            <p className="text-sm text-gray-400">
+              기출 패턴 {totalPatternCount}개 ·
+              &ldquo;{selectedPassage.title}&rdquo; 지문 적용
+            </p>
+          </div>
+
+          {/* 문항 수 선택 */}
+          <div className="border-t border-gray-100 px-6 py-5">
+            <p className="text-sm font-semibold text-gray-700 mb-3">생성할 문항 수</p>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setQuestionCount(c => Math.max(1, c - 1))}
+                className="w-9 h-9 rounded-full border-2 border-gray-200 flex items-center justify-center text-gray-600 hover:border-green-400 hover:text-green-700 transition-colors text-xl font-bold"
+              >
+                −
+              </button>
+              <div className="flex-1 text-center">
+                <span className="text-3xl font-bold text-green-700">{questionCount}</span>
+                <span className="text-sm text-gray-400 ml-1">문항</span>
+              </div>
+              <button
+                onClick={() => setQuestionCount(c => Math.min(30, c + 1))}
+                className="w-9 h-9 rounded-full border-2 border-gray-200 flex items-center justify-center text-gray-600 hover:border-green-400 hover:text-green-700 transition-colors text-xl font-bold"
+              >
+                +
+              </button>
+            </div>
+            <div className="flex justify-between mt-3 px-1">
+              {[5, 10, 15, 20].map(n => (
+                <button
+                  key={n}
+                  onClick={() => setQuestionCount(n)}
+                  className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                    questionCount === n
+                      ? "bg-green-600 text-white border-green-600"
+                      : "border-gray-200 text-gray-500 hover:border-green-300"
+                  }`}
+                >
+                  {n}문항
+                </button>
+              ))}
+            </div>
+            {totalPatternCount > 0 && questionCount > totalPatternCount && (
+              <p className="text-xs text-amber-600 mt-2 text-center">
+                패턴 {totalPatternCount}개를 순환해서 {questionCount}문항 생성
+              </p>
+            )}
+          </div>
+
+          <div className="px-6 pb-6">
+            <button
+              onClick={generate}
+              className="w-full py-3.5 bg-green-600 text-white rounded-xl text-base font-bold hover:bg-green-700 transition-colors shadow-md"
+            >
+              {questionCount}문항 생성하기
+            </button>
+          </div>
         </div>
       )}
 
@@ -758,13 +809,25 @@ function GenerateStep({
             ))}
           </div>
 
-          <div className="mt-6">
+          <div className="mt-6 flex items-center gap-4 flex-wrap">
             <button
               onClick={generate}
               className="text-sm text-gray-400 hover:text-gray-600 underline"
             >
-              마음에 들지 않으면 다시 생성하기
+              다시 생성하기 ({questionCount}문항)
             </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">문항수 변경:</span>
+              <button
+                onClick={() => setQuestionCount(c => Math.max(1, c - 1))}
+                className="w-6 h-6 rounded border border-gray-200 text-gray-500 hover:border-green-400 text-sm font-bold flex items-center justify-center"
+              >−</button>
+              <span className="text-sm font-bold text-green-700 min-w-[2ch] text-center">{questionCount}</span>
+              <button
+                onClick={() => setQuestionCount(c => Math.min(30, c + 1))}
+                className="w-6 h-6 rounded border border-gray-200 text-gray-500 hover:border-green-400 text-sm font-bold flex items-center justify-center"
+              >+</button>
+            </div>
           </div>
         </>
       )}

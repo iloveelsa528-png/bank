@@ -23,6 +23,16 @@ export interface PdfSection {
 
 const CIRCLE = ["①", "②", "③", "④", "⑤"];
 
+function escapeHtml(s: string | undefined | null): string {
+  if (!s) return "";
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function today() {
   return new Date()
     .toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" })
@@ -88,7 +98,7 @@ export function buildHeaderSection(data: PdfData, mode: PdfMode): string {
     <div style="padding:20px 32px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
         <h1 style="font-size:18px;font-weight:800;color:#111827;line-height:1.4;flex:1">
-          ${data.title}
+          ${escapeHtml(data.title)}
         </h1>
         <span style="background:${modeBg};color:#fff;padding:4px 14px;border-radius:4px;
           font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0;margin-top:3px">
@@ -96,7 +106,7 @@ export function buildHeaderSection(data: PdfData, mode: PdfMode): string {
         </span>
       </div>
       <div style="margin-top:5px;font-size:11px;color:#6b7280;display:flex;justify-content:space-between">
-        <span>${meta}</span>
+        <span>${escapeHtml(meta)}</span>
         <span>생성일: ${date}</span>
       </div>
       <div style="margin-top:10px;border-bottom:2px solid #111827"></div>
@@ -124,7 +134,7 @@ export function buildPassageSection(data: PdfData, mode: PdfMode): string {
     mode === "full" && data.keyPoints
       ? `<div style="margin-top:12px;padding:8px 12px;border-top:1px dashed #d1d5db;
             font-size:12px;color:#374151;">
-          <strong style="color:#6d28d9;">핵심 포인트: </strong>${data.keyPoints}
+          <strong style="color:#6d28d9;">핵심 포인트: </strong>${escapeHtml(data.keyPoints)}
         </div>`
       : "";
 
@@ -136,14 +146,14 @@ export function buildPassageSection(data: PdfData, mode: PdfMode): string {
             ◆ 다음 글을 읽고 물음에 답하시오.
           </span>
           ${data.passageTitle
-            ? `<span style="font-size:11px;color:#93c5fd;">[${data.passageTitle}]</span>`
+            ? `<span style="font-size:11px;color:#93c5fd;">[${escapeHtml(data.passageTitle)}]</span>`
             : ""}
         </div>
         <div style="padding:14px 22px;">
           ${imagesHtml}
           ${data.passageText
             ? `<p style="font-size:13px;color:#111827;line-height:1.85;
-                white-space:pre-wrap;word-break:keep-all;">${data.passageText}</p>`
+                white-space:pre-wrap;word-break:keep-all;">${escapeHtml(data.passageText)}</p>`
             : ""}
           ${keyPointsHtml}
         </div>
@@ -166,7 +176,7 @@ export function buildQuestionSection(q: PatternBasedQuestion, mode: PdfMode): st
               const mark = mode !== "student" && highlight ? " ★" : "";
               const reasonHtml =
                 showAnswerInfo && c.reason
-                  ? `<div style="font-size:10px;color:#6b7280;margin-top:2px;padding-left:18px;line-height:1.5;">${c.reason}</div>`
+                  ? `<div style="font-size:10px;color:#6b7280;margin-top:2px;padding-left:18px;line-height:1.5;">${escapeHtml(c.reason)}</div>`
                   : "";
               return `
               <div style="padding:5px 10px;border-radius:3px;
@@ -175,7 +185,7 @@ export function buildQuestionSection(q: PatternBasedQuestion, mode: PdfMode): st
                 <div style="display:flex;gap:6px;align-items:flex-start;">
                   <span style="font-weight:700;color:${highlight ? "#16a34a" : "#111827"};
                     flex-shrink:0;font-size:13px;">${circle}${mark}</span>
-                  <span style="color:${highlight ? "#166534" : "#111827"};flex:1;font-size:13px;line-height:1.6;">${c.text}</span>
+                  <span style="color:${highlight ? "#166534" : "#111827"};flex:1;font-size:13px;line-height:1.6;">${escapeHtml(c.text)}</span>
                 </div>
                 ${reasonHtml}
               </div>`;
@@ -197,7 +207,7 @@ export function buildQuestionSection(q: PatternBasedQuestion, mode: PdfMode): st
       ? `<div style="margin-top:8px;padding:10px;background:#eff6ff;
             border-left:3px solid #3b82f6;font-size:12px;color:#1e40af;">
           <strong>모범 답안</strong><br/>
-          <span style="white-space:pre-wrap;">${q.descriptive_answer}</span>
+          <span style="white-space:pre-wrap;">${escapeHtml(q.descriptive_answer)}</span>
         </div>`
       : "";
 
@@ -206,7 +216,7 @@ export function buildQuestionSection(q: PatternBasedQuestion, mode: PdfMode): st
       ? `<div style="margin-top:8px;padding:10px;background:#fefce8;
             border-left:3px solid #eab308;font-size:11px;color:#713f12;">
           <strong>해설</strong><br/>
-          <span style="white-space:pre-wrap;">${q.explanation}</span>
+          <span style="white-space:pre-wrap;">${escapeHtml(q.explanation)}</span>
         </div>`
       : "";
 
@@ -220,7 +230,7 @@ export function buildQuestionSection(q: PatternBasedQuestion, mode: PdfMode): st
   const patternRef =
     mode === "full" && q.pattern_reference
       ? `<div style="font-size:10px;color:#7c3aed;margin-top:3px;">
-          패턴: ${q.pattern_reference}
+          패턴: ${escapeHtml(q.pattern_reference)}
         </div>`
       : "";
 
@@ -233,7 +243,7 @@ export function buildQuestionSection(q: PatternBasedQuestion, mode: PdfMode): st
           </span>
           <div style="flex:1;">
             <p style="font-size:13px;font-weight:600;color:#111827;line-height:1.7;word-break:keep-all;">
-              ${q.question_text}${infoTag}
+              ${escapeHtml(q.question_text)}${infoTag}
             </p>
             ${patternRef}
           </div>

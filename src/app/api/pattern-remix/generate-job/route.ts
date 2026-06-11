@@ -31,6 +31,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '선택된 패턴 세트에 추출된 패턴이 없습니다.' }, { status: 400 });
   }
 
+  // 원하는 문항 수만큼 패턴을 순환 확장 (기본: 패턴 수)
+  const questionCount = typeof body.question_count === 'number' && body.question_count > 0
+    ? Math.min(Math.floor(body.question_count), 30)
+    : allPatterns.length;
+  const finalPatterns: Record<string, unknown>[] = Array.from(
+    { length: questionCount },
+    (_, i) => allPatterns[i % allPatterns.length],
+  );
+
   // 첫 번째 패턴 세트가 존재하는지 확인 (제목 등 메타데이터용)
   const firstPatternSet = db.prepare('SELECT * FROM pattern_sets WHERE id = ?').get(ids[0]) as Record<string, unknown> | undefined;
   if (!firstPatternSet) {
@@ -46,7 +55,7 @@ export async function POST(request: NextRequest) {
   }
 
   const job = createQuestionGenerateJob(
-    allPatterns as unknown as Parameters<typeof createQuestionGenerateJob>[0],
+    finalPatterns as unknown as Parameters<typeof createQuestionGenerateJob>[0],
     passage.passage_text as string,
     passage.title as string,
     (passage.area as string) ?? '',
