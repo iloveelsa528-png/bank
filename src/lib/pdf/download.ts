@@ -119,41 +119,43 @@ export async function downloadPdf(data: PdfData, mode: PdfMode) {
     return slice.toDataURL("image/jpeg", 0.95);
   }
 
-  let curY = 0;       // 현재 페이지의 y 위치 (mm)
-  let pageCount = 1;
+  let curY = 0; // 현재 페이지의 y 위치 (mm)
 
-  // 섹션 하나를 페이지에 배치 (섹션이 여러 페이지에 걸칠 수도 있음)
+  function newPage() {
+    pdf.addPage();
+    curY = V_MARGIN;
+  }
+
+  // 섹션 하나를 페이지에 배치
+  // - 섹션이 현재 페이지에 안 들어가면 → 새 페이지에서 시작
+  // - 새 페이지에서도 넘칠 만큼 크면 → 페이지 경계에서 슬라이스 (불가피)
   function placeCanvas(canvas: HTMLCanvasElement) {
-    const pxPerMm = canvas.width / PAGE_W; // 1mm = x 픽셀
+    const pxPerMm = canvas.width / PAGE_W;
     const totalMm = canvas.height / pxPerMm;
 
-    // 현재 페이지에 안 들어가면 새 페이지로
-    if (pageCount > 1 && curY + totalMm > PAGE_H - V_MARGIN) {
-      pdf.addPage();
-      pageCount++;
-      curY = V_MARGIN;
+    // 현재 페이지에 이미 내용이 있고 섹션이 안 들어가면 새 페이지
+    if (curY > 0 && curY + totalMm > PAGE_H - V_MARGIN) {
+      newPage();
     }
 
-    let remMm = totalMm;   // 아직 배치 안 된 높이 (mm)
+    let remMm   = totalMm;
     let startPx = 0;
 
-    while (remMm > 0) {
-      const avail = PAGE_H - curY; // 현재 페이지에 남은 공간 (mm)
+    while (remMm > 0.5) { // 0.5mm 미만은 부동소수점 오차로 무시
+      const avail   = PAGE_H - curY;
       const chunkMm = Math.min(remMm, avail);
-      const endPx = startPx + chunkMm * pxPerMm;
+      const endPx   = Math.round(startPx + chunkMm * pxPerMm);
 
-      const imgData = sliceImgData(canvas, startPx, endPx);
-      pdf.addImage(imgData, "JPEG", 0, curY, PAGE_W, chunkMm);
+      pdf.addImage(
+        sliceImgData(canvas, Math.round(startPx), endPx),
+        "JPEG", 0, curY, PAGE_W, chunkMm
+      );
 
-      curY   += chunkMm;
-      startPx = endPx;
-      remMm  -= chunkMm;
+      curY    += chunkMm;
+      startPx  = endPx;
+      remMm   -= chunkMm;
 
-      if (remMm > 0) {
-        pdf.addPage();
-        pageCount++;
-        curY = V_MARGIN;
-      }
+      if (remMm > 0.5) newPage();
     }
   }
 
