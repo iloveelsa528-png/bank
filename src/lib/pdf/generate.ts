@@ -130,8 +130,8 @@ export function buildPassageSection(data: PdfData, mode: PdfMode): string {
 
   return fullDoc(`
     <div style="padding:12px 32px 0">
-      <div style="border:2px solid #1e3a8a;border-radius:4px;overflow:hidden;">
-        <div style="background:#1e3a8a;padding:8px 18px;display:flex;align-items:center;gap:10px;">
+      <div style="border:2px solid #1e3a8a;border-radius:4px;overflow:visible;">
+        <div style="background:#1e3a8a;padding:8px 18px;display:flex;align-items:center;gap:10px;border-radius:3px 3px 0 0;">
           <span style="font-size:13px;font-weight:700;color:#fff;">
             ◆ 다음 글을 읽고 물음에 답하시오.
           </span>
@@ -139,10 +139,10 @@ export function buildPassageSection(data: PdfData, mode: PdfMode): string {
             ? `<span style="font-size:11px;color:#93c5fd;">[${data.passageTitle}]</span>`
             : ""}
         </div>
-        <div style="padding:16px 22px;">
+        <div style="padding:14px 22px;">
           ${imagesHtml}
           ${data.passageText
-            ? `<p style="font-size:14px;color:#111827;line-height:2.0;
+            ? `<p style="font-size:13px;color:#111827;line-height:1.85;
                 white-space:pre-wrap;word-break:keep-all;">${data.passageText}</p>`
             : ""}
           ${keyPointsHtml}
