@@ -90,6 +90,24 @@ export default function Home() {
 
       <main className="max-w-lg mx-auto px-4 py-6 pb-28 flex flex-col gap-3">
 
+        {/* 빠른 이어가기 배너 */}
+        {stats && stats.patternSets > 0 && stats.passages > 0 && (
+          <Link
+            href="/pattern-remix/generate"
+            className="bg-green-600 text-white rounded-2xl p-4 flex items-center justify-between hover:bg-green-700 transition-colors shadow-md"
+          >
+            <div>
+              <p className="text-sm font-bold">✨ 바로 문제 만들기</p>
+              <p className="text-xs text-green-100 mt-0.5">
+                패턴 {stats.patternSets}개 · 지문 {stats.passages}개 준비됨
+              </p>
+            </div>
+            <svg className="w-5 h-5 text-green-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        )}
+
         {/* 3단계 카드 */}
         {STEPS.map((step, i) => {
           const status = stats ? step.getStatus(stats) : null;
