@@ -214,11 +214,20 @@ export async function downloadPdf(data: PdfData, mode: PdfMode) {
     const pxPerMm = canvas.width / COL_W;
     const totalMm = canvas.height / pxPerMm;
 
-    // 섹션이 컬럼 안에 들어갈 크기이고, 현재 컬럼에 내용이 있고, 안 들어가면 → 다음 컬럼
-    const maxColH  = PAGE_H - 2 * V_MARGIN;  // 273mm
-    const colAvail = PAGE_H - V_MARGIN - colYs[curCol];
-    if (totalMm <= maxColH && colYs[curCol] > colTop && totalMm > colAvail) {
-      nextCol();
+    // 문제 섹션이 현재 컬럼에 안 들어갈 때의 처리:
+    //   1) 현재 컬럼 부족 → 다음 컬럼으로
+    //   2) 다음 컬럼도 부족 → 새 페이지로
+    // (슬라이싱은 최후 수단 — 한 컬럼보다 큰 섹션만 허용)
+    const maxColH = PAGE_H - 2 * V_MARGIN;  // 273mm
+    if (totalMm <= maxColH) {
+      const avail0 = PAGE_H - V_MARGIN - colYs[curCol];
+      if (totalMm > avail0) {
+        nextCol();  // 오른쪽 컬럼으로
+        const avail1 = PAGE_H - V_MARGIN - colYs[curCol];
+        if (totalMm > avail1) {
+          newPage();  // 양쪽 다 부족 → 새 페이지
+        }
+      }
     }
 
     let remMm   = totalMm;
