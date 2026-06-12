@@ -44,6 +44,9 @@ export function createQuestionGenerateJob(
   passageTitle: string,
   passageArea: string,
   passageKeyPoints: string,
+  passageAnalysisSummary?: string,
+  passageCandidatePoints?: string,
+  genreAdaptation?: boolean,
 ): Job {
   const batchCount = Math.ceil(patterns.length / GENERATE_BATCH);
   const job = createJob(
@@ -53,6 +56,7 @@ export function createQuestionGenerateJob(
   );
   runQuestionsPipeline(
     job.id, patterns, passageText, passageTitle, passageArea, passageKeyPoints,
+    passageAnalysisSummary, passageCandidatePoints, genreAdaptation,
   ).catch(err => console.error('[questions pipeline error]', err));
   return job;
 }

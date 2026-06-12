@@ -32,6 +32,11 @@ export interface PatternBasedQuestionSet {
   updated_at: string;
   visibility: 'private' | 'link_only' | 'neighbors' | 'public';
   share_token: string;
+  // 다중 지문 지원
+  passages?: Array<{
+    title?: string; text?: string; imageUrls?: string[];
+    keyPoints?: string; startQuestionIdx: number; questionCount: number;
+  }>;
   // joins
   exam_pattern_sets?: { title: string; school_name: string; grade: string };
   source_passages?: { title: string; area: string; passage_text?: string; key_points?: string; image_urls?: string[] };

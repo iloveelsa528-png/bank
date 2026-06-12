@@ -79,7 +79,7 @@ export interface AnalyzeResult {
 export async function runAnalyzeChunk(groupText: string): Promise<AnalyzeResult> {
   const response = await client.messages.parse({
     model: 'claude-sonnet-4-6',
-    max_tokens: 8000,
+    max_tokens: 16000,
     system: `당신은 국어 시험지 OCR 텍스트를 구조화하고 출제 패턴을 분석하는 전문가입니다.
 두 가지를 동시에 수행합니다:
 1. OCR 텍스트에서 지문·문항·선택지를 정확히 파싱
@@ -106,6 +106,9 @@ ${groupText}
     },
   });
 
+  if (response.stop_reason === 'max_tokens') {
+    throw new Error('analyze chunk: 출력이 너무 길어 중단되었습니다. 시험지 이미지를 더 작은 단위로 나눠서 업로드하세요.');
+  }
   const parsed = response.parsed_output as Record<string, unknown> | null;
   if (!parsed) throw new Error('analyze chunk: 분석 결과를 생성하지 못했습니다.');
 

@@ -17,6 +17,9 @@ export async function runQuestionsPipeline(
   passageTitle: string,
   passageArea: string,
   passageKeyPoints: string,
+  passageAnalysisSummary?: string,
+  passageCandidatePoints?: string,
+  genreAdaptation?: boolean,
 ): Promise<void> {
   try {
     updateJob(jobId, { status: 'running' });
@@ -34,6 +37,7 @@ export async function runQuestionsPipeline(
         const startNumber = batchIdx * BATCH_SIZE + 1;
         const result = await runGenerateChunk(
           batch, passageText, passageTitle, passageArea, passageKeyPoints, startNumber,
+          passageAnalysisSummary, passageCandidatePoints, genreAdaptation,
         );
         batchResults[batchIdx] = result.output.questions;
         const cur = getJob(jobId);

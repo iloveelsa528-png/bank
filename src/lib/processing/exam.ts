@@ -69,7 +69,7 @@ export async function runExamPipeline(jobId: string, localImagePaths: string[]):
     updateJob(jobId, {
       status: 'completed',
       completed_chunks: finalJob?.total_chunks ?? 0,
-      result: { groups: analyzeResults, ocrRawText: allOcrText },
+      result: { groups: analyzeResults, ocrRawText: allOcrText, segmentFailed: segResult.segmentFailed },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

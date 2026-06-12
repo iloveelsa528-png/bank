@@ -36,10 +36,16 @@ export interface SegmentGroup {
 
 export interface SegmentResult {
   groups: SegmentGroup[];
+  segmentFailed: boolean;
   usage: { model: string; input_tokens: number; output_tokens: number };
 }
 
 const SEGMENT_MAX_GROUPS = 12;
+
+// NFC 정규화 + 비개행 공백 통일 → indexOf 오탐 방지 (유니코드·공백 변형 흡수)
+function normalizeForSearch(text: string): string {
+  return text.normalize('NFC').replace(/[^\S\n]+/g, ' ');
+}
 
 export async function runSegmentChunk(allOcrText: string): Promise<SegmentResult> {
   try {
@@ -76,27 +82,33 @@ ${allOcrText}`,
     };
 
     if (rawGroups.length === 0) {
-      return { groups: [{ label: '', text: allOcrText }], usage };
+      return { groups: [{ label: '', text: allOcrText }], segmentFailed: true, usage };
     }
 
-    // startsWith 마커로 원문 슬라이싱 → 각 그룹의 실제 텍스트 추출
+    // NFC 정규화 텍스트로 indexOf 검색 → 유니코드·공백 차이에 의한 매칭 실패 방지
+    const normOcrText = normalizeForSearch(allOcrText);
     const groups: SegmentGroup[] = rawGroups.map((g, idx, arr) => {
-      const start = allOcrText.indexOf(g.startsWith);
-      const nextIdx = arr[idx + 1] ? allOcrText.indexOf(arr[idx + 1].startsWith) : -1;
-      const end = nextIdx > start ? nextIdx : allOcrText.length;
-      const text = start >= 0 ? allOcrText.slice(start, end).trim() : '';
+      const start = normOcrText.indexOf(normalizeForSearch(g.startsWith));
+      const nextRaw = arr[idx + 1];
+      const nextIdx = nextRaw ? normOcrText.indexOf(normalizeForSearch(nextRaw.startsWith)) : -1;
+      const end = nextIdx > start ? nextIdx : normOcrText.length;
+      const text = start >= 0 ? normOcrText.slice(start, end).trim() : '';
       return { label: g.label, text: text || allOcrText };
     });
 
     const validGroups = groups.filter(g => g.text.length > 20);
+    // validGroups 2개 이상이면 실제 분할 성공 — startsWith 개별 실패와 무관하게 성공 처리
+    const segmentFailed = validGroups.length <= 1;
     return {
       groups: validGroups.length > 0 ? validGroups : [{ label: '', text: allOcrText }],
+      segmentFailed,
       usage,
     };
   } catch (err) {
     console.warn('[segment] parse failed, falling back to single group:', err instanceof Error ? err.message : err);
     return {
       groups: [{ label: '', text: allOcrText }],
+      segmentFailed: true,
       usage: { model: 'claude-haiku-4-5-20251001', input_tokens: 0, output_tokens: 0 },
     };
   }

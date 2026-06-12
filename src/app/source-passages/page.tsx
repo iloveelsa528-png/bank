@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CandidateQuestionPoint } from "@/types/passages";
@@ -24,6 +24,15 @@ const INPUT_CLS  = "w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm
 const SELECT_CLS = "w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 bg-white";
 const LABEL_CLS  = "text-xs font-semibold text-gray-600 mb-1 block";
 
+// analyze.ts 파이프라인 결과의 지문 그룹 타입 (image mode 전용)
+type ExamGroup = {
+  passageGroupLabel?: string;
+  area?: string;
+  passageTitle?: string;
+  passageContent?: string;
+  questions: Array<{ questionNumber?: number; questionText?: string }>;
+};
+
 function Spinner({ size = 4 }: { size?: number }) {
   return (
     <svg className={`w-${size} h-${size} animate-spin`} fill="none" viewBox="0 0 24 24">
@@ -43,10 +52,16 @@ type InputMode = "image" | "text";
 
 export default function SourcePassagesPage() {
   const router = useRouter();
-  const [mode, setMode]             = useState<InputMode>("image");
-  const [images, setImages]         = useState<File[]>([]);
-  const [ocrLoading, setOcrLoading] = useState(false);
-  const [ocrDone, setOcrDone]       = useState(false);
+  const [mode, setMode]     = useState<InputMode>("image");
+  const [images, setImages] = useState<File[]>([]);
+
+  // ── image mode: OCR→Segment→Analyze 파이프라인 상태 ──────────────────────
+  const [examJobRunning, setExamJobRunning]       = useState(false);
+  const [examJobId, setExamJobId]                 = useState<string | null>(null);
+  const [examGroups, setExamGroups]               = useState<ExamGroup[] | null>(null);
+  const [examSegmentFailed, setExamSegmentFailed] = useState(false);
+  const [selectedGroupIdx, setSelectedGroupIdx]   = useState<number | null>(null);
+  // ─────────────────────────────────────────────────────────────────────────
 
   const [passageText, setPassageText] = useState("");
   const [ocrRaw, setOcrRaw]           = useState("");
@@ -69,48 +84,91 @@ export default function SourcePassagesPage() {
   const [error, setError]     = useState("");
 
   const analysisReady = !!analysisSummary;
+  const examJobDone   = examGroups !== null;
 
   const autoTitle = passageText.trim()
     ? passageText.trim().split("\n").find(l => l.trim())?.slice(0, 30) ?? "지문"
     : "";
   const effectiveTitle = title.trim() || autoTitle;
 
+  // ── image mode 이벤트 핸들러 ─────────────────────────────────────────────
+
+  const resetExamState = () => {
+    setExamJobId(null); setExamGroups(null); setExamSegmentFailed(false); setSelectedGroupIdx(null);
+  };
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"));
     setImages(prev => [...prev, ...files].slice(0, 20));
-    setOcrDone(false);
+    resetExamState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []).filter(f => f.type.startsWith("image/"));
     setImages(prev => [...prev, ...files].slice(0, 20));
-    setOcrDone(false);
+    resetExamState();
   };
 
-  const handleOcr = async () => {
+  // OCR → Segment → Analyze 파이프라인 시작
+  const handleExamAnalyze = async () => {
     if (images.length === 0) return;
-    setOcrLoading(true);
-    setOcrDone(false);
+    setExamJobRunning(true);
+    resetExamState();
+    setPassageText(""); setOcrRaw("");
+    setAnalysisSummary(""); setKeyPoints(""); setCandidatePoints([]);
+    setPassageJobId(null); setPassageJobDone(false);
     try {
       const formData = new FormData();
       images.forEach((f, i) => formData.append(`image_${i}`, f));
       formData.append("imageCount", String(images.length));
-      const res = await fetch("/api/ocr", { method: "POST", body: formData });
-      if (!res.ok) throw new Error((await res.json()).error || "오류");
-      const { text } = await res.json();
-      setOcrRaw(text ?? "");
-      setPassageText(text ?? "");
-      setOcrDone(true);
-      if (text?.trim()) await runAnalyze(text.trim());
+      const res = await fetch("/api/uploads/exam", { method: "POST", body: formData });
+      if (!res.ok) throw new Error((await res.json()).error || "분석 시작 실패");
+      const { jobId } = await res.json();
+      setExamJobId(jobId);
+      setSourceJobId(jobId);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "글자 읽기 실패");
+      alert(e instanceof Error ? e.message : "분석 시작 실패");
     } finally {
-      setOcrLoading(false);
+      setExamJobRunning(false);
     }
   };
 
-  const applyAnalysisResult = (data: { analysis_summary?: string; key_points?: string; candidate_question_points?: CandidateQuestionPoint[] }) => {
+  // 그룹 선택 → passageContent를 textarea에 채우고 passage.ts 분석 자동 실행
+  const handleSelectGroup = (idx: number, group: ExamGroup) => {
+    setSelectedGroupIdx(idx);
+    const content = group.passageContent ?? "";
+    setPassageText(content);
+    if (group.area) setArea(group.area);
+    setAnalysisSummary(""); setKeyPoints(""); setCandidatePoints([]);
+    if (content.trim()) runAnalyze(content.trim());
+  };
+
+  // exam 파이프라인 완료 → 그룹 목록 세팅, 1개면 자동 선택
+  const handleExamJobComplete = (job: Job) => {
+    if (!job.result) return;
+    const result = job.result as {
+      groups?: ExamGroup[];
+      ocrRawText?: string;
+      segmentFailed?: boolean;
+    };
+    const groups = result.groups ?? [];
+    setExamGroups(groups);
+    setOcrRaw(result.ocrRawText ?? "");
+    setExamSegmentFailed(result.segmentFailed ?? false);
+    if (groups.length === 1) {
+      handleSelectGroup(0, groups[0]);
+    }
+  };
+
+  // ── text mode / 공통 핸들러 ───────────────────────────────────────────────
+
+  const applyAnalysisResult = (data: {
+    analysis_summary?: string;
+    key_points?: string;
+    candidate_question_points?: CandidateQuestionPoint[];
+  }) => {
     setAnalysisSummary(data.analysis_summary ?? "");
     setKeyPoints(data.key_points ?? "");
     setCandidatePoints(data.candidate_question_points ?? []);
@@ -118,7 +176,7 @@ export default function SourcePassagesPage() {
 
   const runAnalyze = async (text: string) => {
     setAnalysisSummary(""); setKeyPoints(""); setCandidatePoints([]);
-    setPassageJobId(null); setPassageJobDone(false); setSourceJobId(null);
+    setPassageJobId(null); setPassageJobDone(false);
 
     if (text.length > PASSAGE_SYNC_LIMIT) {
       setAnalyzing(true);
@@ -162,7 +220,11 @@ export default function SourcePassagesPage() {
 
   const handleJobComplete = (job: Job) => {
     if (!job.result) return;
-    const result = job.result as { analysis_summary?: string; key_points?: string; candidate_question_points?: CandidateQuestionPoint[] };
+    const result = job.result as {
+      analysis_summary?: string;
+      key_points?: string;
+      candidate_question_points?: CandidateQuestionPoint[];
+    };
     applyAnalysisResult(result);
     setPassageJobDone(true);
     setSourceJobId(job.id);
@@ -195,7 +257,9 @@ export default function SourcePassagesPage() {
   };
 
   const handleReset = () => {
-    setImages([]); setPassageText(""); setOcrRaw(""); setOcrDone(false);
+    setImages([]);
+    setExamJobRunning(false); resetExamState();
+    setPassageText(""); setOcrRaw("");
     setTitle(""); setArea(""); setSourceType("");
     setAnalysisSummary(""); setKeyPoints(""); setCandidatePoints([]);
     setPassageJobId(null); setPassageJobDone(false); setSourceJobId(null);
@@ -203,6 +267,8 @@ export default function SourcePassagesPage() {
   };
 
   const canSave = !!passageText.trim() && !savedId;
+
+  // ── 렌더 ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -266,74 +332,159 @@ export default function SourcePassagesPage() {
           ))}
         </div>
 
-        {/* 이미지 업로드 카드 */}
+        {/* ── IMAGE MODE ── */}
         {mode === "image" && (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col gap-3">
-            <p className="text-sm font-bold text-gray-800">지문 사진 업로드</p>
-            {images.length === 0 ? (
-              <div
-                onDrop={handleDrop}
-                onDragOver={e => e.preventDefault()}
-                onClick={() => document.getElementById("passage-file-input")?.click()}
-                className="border-2 border-dashed border-gray-200 rounded-xl p-8 flex flex-col items-center gap-2 cursor-pointer hover:border-green-300 hover:bg-green-50/30 transition-colors">
-                <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-                <p className="text-sm text-gray-500 font-medium">여기를 눌러 사진을 선택하세요</p>
-                <p className="text-xs text-gray-400">드래그해서 올려도 됩니다 · 최대 20장</p>
-              </div>
-            ) : (
-              <div
-                onDrop={handleDrop}
-                onDragOver={e => e.preventDefault()}
-                className="flex flex-col gap-2">
-                {images.map((f, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={URL.createObjectURL(f)} alt={f.name}
-                      className="w-12 h-12 object-cover rounded-lg border border-gray-200 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-gray-800 truncate">{f.name}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{i + 1}페이지 · {fmtSize(f.size)}</p>
-                      {ocrDone && i === 0 && (
-                        <span className="text-xs text-green-600">✓ 글자 읽기 완료</span>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => { setImages(p => p.filter((_, j) => j !== i)); setOcrDone(false); }}
-                      className="w-6 h-6 bg-red-100 text-red-500 rounded-full text-xs hover:bg-red-200 flex items-center justify-center flex-shrink-0">×</button>
-                  </div>
-                ))}
-                <button
+          <>
+            {/* 이미지 업로드 카드 */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col gap-3">
+              <p className="text-sm font-bold text-gray-800">지문 사진 업로드</p>
+              {images.length === 0 ? (
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={e => e.preventDefault()}
                   onClick={() => document.getElementById("passage-file-input")?.click()}
-                  className="py-2 rounded-xl border-2 border-dashed border-gray-200 text-xs text-gray-400 hover:border-green-300 hover:text-green-500 transition-colors">
-                  + 사진 더 추가하기 ({images.length}/20)
-                </button>
+                  className="border-2 border-dashed border-gray-200 rounded-xl p-8 flex flex-col items-center gap-2 cursor-pointer hover:border-green-300 hover:bg-green-50/30 transition-colors">
+                  <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  <p className="text-sm text-gray-500 font-medium">여기를 눌러 사진을 선택하세요</p>
+                  <p className="text-xs text-gray-400">드래그해서 올려도 됩니다 · 최대 20장</p>
+                </div>
+              ) : (
+                <div onDrop={handleDrop} onDragOver={e => e.preventDefault()} className="flex flex-col gap-2">
+                  {images.map((f, i) => (
+                    <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={URL.createObjectURL(f)} alt={f.name}
+                        className="w-12 h-12 object-cover rounded-lg border border-gray-200 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-800 truncate">{f.name}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{i + 1}페이지 · {fmtSize(f.size)}</p>
+                        {examJobDone && i === 0 && (
+                          <span className="text-xs text-green-600">✓ 분석 완료</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setImages(p => p.filter((_, j) => j !== i));
+                          resetExamState();
+                        }}
+                        className="w-6 h-6 bg-red-100 text-red-500 rounded-full text-xs hover:bg-red-200 flex items-center justify-center flex-shrink-0">
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => document.getElementById("passage-file-input")?.click()}
+                    className="py-2 rounded-xl border-2 border-dashed border-gray-200 text-xs text-gray-400 hover:border-green-300 hover:text-green-500 transition-colors">
+                    + 사진 더 추가하기 ({images.length}/20)
+                  </button>
+                </div>
+              )}
+              <input id="passage-file-input" type="file" multiple accept="image/*" className="hidden" onChange={handleFileInput} />
+
+              {/* 분석 시작 버튼 또는 진행률 */}
+              {!examJobId ? (
+                <>
+                  <button
+                    onClick={handleExamAnalyze}
+                    disabled={images.length === 0 || examJobRunning}
+                    className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold transition-all ${
+                      images.length > 0 && !examJobRunning
+                        ? examJobDone
+                          ? "bg-green-50 text-green-700 border border-green-300 hover:bg-green-100"
+                          : "bg-green-600 text-white hover:bg-green-700 shadow-sm"
+                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    }`}>
+                    {examJobRunning
+                      ? <><Spinner /> 분석 요청 중…</>
+                      : examJobDone
+                        ? "✓ 분석 완료 — 재분석하기"
+                        : "🔍  지문 분석 시작 (OCR + 자동 분할)"}
+                  </button>
+                  {images.length > 0 && !examJobDone && !examJobRunning && (
+                    <p className="text-xs text-gray-400 text-center">
+                      사진에서 글자를 읽고, 지문 단위로 자동 분리합니다
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 flex flex-col gap-2">
+                  <p className="text-xs text-purple-700 font-medium">
+                    OCR → 지문 분할 → 패턴 분석 순서로 진행합니다 (보통 30~60초)
+                  </p>
+                  <JobRunner jobId={examJobId} onComplete={handleExamJobComplete} />
+                  <button
+                    onClick={() => { setExamJobId(null); setExamGroups(null); setSelectedGroupIdx(null); }}
+                    className="text-xs text-gray-400 hover:text-gray-600 underline self-start">
+                    취소
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 지문 그룹 선택 카드 (분석 완료 + 그룹 2개 이상) */}
+            {examGroups !== null && examGroups.length > 1 && (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col gap-3">
+                <div>
+                  <p className="text-sm font-bold text-gray-800">지문 그룹 선택</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {examGroups.length}개의 지문 그룹을 찾았습니다. 등록할 지문 하나를 선택하세요.
+                  </p>
+                </div>
+
+                {examSegmentFailed && (
+                  <div className="bg-amber-50 border border-amber-300 rounded-xl px-3 py-2.5 flex gap-2 items-start">
+                    <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    </svg>
+                    <p className="text-xs text-amber-700">
+                      지문 자동 분할에 실패했습니다. 선택 후 텍스트가 올바른지 확인하고 수정해 주세요.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  {examGroups.map((g, i) => {
+                    const firstQ = g.questions[0];
+                    const label = g.passageGroupLabel
+                      || (firstQ?.questionNumber != null ? `${firstQ.questionNumber}번~` : `그룹 ${i + 1}`);
+                    const preview = (g.passageContent ?? "").slice(0, 80).trim();
+                    const isSelected = selectedGroupIdx === i;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => handleSelectGroup(i, g)}
+                        className={`w-full text-left p-3 rounded-xl border transition-all ${
+                          isSelected
+                            ? "border-green-400 bg-green-50 ring-2 ring-green-200"
+                            : "border-gray-200 bg-gray-50 hover:border-green-300 hover:bg-green-50/40"
+                        }`}>
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="text-sm font-semibold text-gray-800">{label}</span>
+                          {g.area && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{g.area}</span>
+                          )}
+                          {g.passageTitle && (
+                            <span className="text-xs text-gray-500">「{g.passageTitle}」</span>
+                          )}
+                          {isSelected && (
+                            <span className="ml-auto text-xs font-bold text-green-600">✓ 선택됨</span>
+                          )}
+                        </div>
+                        {preview && (
+                          <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">{preview}…</p>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
-            <input id="passage-file-input" type="file" multiple accept="image/*" className="hidden" onChange={handleFileInput} />
-
-            <button onClick={handleOcr} disabled={images.length === 0 || ocrLoading}
-              className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold transition-all ${
-                images.length > 0 && !ocrLoading
-                  ? ocrDone
-                    ? "bg-green-50 text-green-700 border border-green-300 hover:bg-green-100"
-                    : "bg-green-600 text-white hover:bg-green-700 shadow-sm"
-                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
-              }`}>
-              {ocrLoading
-                ? <><Spinner /> 글자 읽는 중… (잠시만 기다려주세요)</>
-                : ocrDone
-                  ? "✓ 글자 읽기 완료 — 다시 읽기"
-                  : "📖  글자 읽기 시작"}
-            </button>
-            {images.length > 0 && !ocrDone && !ocrLoading && (
-              <p className="text-xs text-gray-400 text-center">버튼을 누르면 사진에서 글자를 자동으로 읽어옵니다</p>
-            )}
-          </div>
+          </>
         )}
 
-        {/* 지문 텍스트 */}
+        {/* 지문 텍스트 (image mode: 그룹 선택 후 채워짐 / text mode: 직접 입력) */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-bold text-gray-800">
@@ -347,15 +498,17 @@ export default function SourcePassagesPage() {
             onChange={e => { setPassageText(e.target.value); setAnalysisSummary(""); setCandidatePoints([]); }}
             placeholder={
               mode === "image" && !passageText
-                ? "위에서 '글자 읽기'를 누르면 텍스트가 여기에 표시됩니다.\n내용을 직접 수정하거나 붙여넣어도 됩니다."
+                ? "위에서 '지문 분석 시작'을 누르면 선택한 지문 텍스트가 여기에 표시됩니다.\n내용을 직접 수정해도 됩니다."
                 : "지문을 여기에 입력하거나 붙여넣으세요.\n(교과서, 수능 지문, 직접 작성 모두 가능)"
             }
             rows={mode === "text" ? 10 : 8}
             className="w-full resize-y border border-gray-200 rounded-xl p-3 text-sm text-gray-800 placeholder:text-gray-400 leading-relaxed focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
           />
 
-          {/* 분석 버튼 */}
-          {(!passageJobId || passageJobDone) && (
+          {/* 분석 버튼:
+              text mode → 항상 노출
+              image mode → 그룹 선택 후(텍스트 채워진 상태)에서 재분석용으로 노출 */}
+          {(!passageJobId || passageJobDone) && (mode === "text" || selectedGroupIdx !== null) && (
             <button
               onClick={handleAnalyze}
               disabled={!passageText.trim() || analyzing}
@@ -383,7 +536,7 @@ export default function SourcePassagesPage() {
           )}
         </div>
 
-        {/* 분석 로딩 */}
+        {/* 분석 로딩 스피너 */}
         {analyzing && (
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 flex flex-col items-center gap-3">
             <svg className="w-10 h-10 animate-spin text-green-500" fill="none" viewBox="0 0 24 24">

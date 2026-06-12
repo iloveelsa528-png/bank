@@ -9,6 +9,7 @@ function buildQuestionSet(row: Record<string, unknown>, db: ReturnType<typeof ge
   return {
     ...row,
     generated_questions: parseJSON(row.generated_questions as string, []),
+    passages: parseJSON(row.passages_json as string, []),
     exam_pattern_sets: ps ?? null,
     source_passages: sp
       ? { ...sp, image_urls: parseJSON(sp.image_urls as string, []) }
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       title, pattern_set_id, source_passage_id,
-      generated_questions, difficulty, area, source_job_id,
+      generated_questions, difficulty, area, source_job_id, passages_json,
     }: {
       title: string;
       pattern_set_id: string;
@@ -41,14 +42,15 @@ export async function POST(request: NextRequest) {
       difficulty: string;
       area: string;
       source_job_id?: string;
+      passages_json?: unknown[];
     } = body;
 
     if (!title?.trim()) return NextResponse.json({ error: '제목을 입력하세요.' }, { status: 400 });
 
     const id = randomUUID();
     db.prepare(`
-      INSERT INTO question_sets (id, title, pattern_set_id, source_passage_id, generated_questions, difficulty, area, source_job_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO question_sets (id, title, pattern_set_id, source_passage_id, generated_questions, difficulty, area, source_job_id, passages_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       title.trim(),
@@ -58,6 +60,7 @@ export async function POST(request: NextRequest) {
       difficulty ?? '',
       area ?? '',
       source_job_id ?? null,
+      passages_json ? stringifyJSON(passages_json) : null,
     );
 
     return NextResponse.json({ id });

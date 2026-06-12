@@ -47,12 +47,23 @@ export async function POST(request: NextRequest) {
   }
 
   const passage = db.prepare(
-    'SELECT id, title, area, source_type, passage_text, key_points FROM source_passages WHERE id = ?'
+    'SELECT id, title, area, source_type, passage_text, key_points, analysis_summary, candidate_question_points FROM source_passages WHERE id = ?'
   ).get(source_passage_id) as Record<string, unknown> | undefined;
   if (!passage) return NextResponse.json({ error: '지문을 찾을 수 없습니다.' }, { status: 404 });
   if (!(passage.passage_text as string)?.trim()) {
     return NextResponse.json({ error: '지문 텍스트가 없습니다.' }, { status: 400 });
   }
+
+  // candidate_question_points는 JSON 배열 → 텍스트로 변환
+  let candidatePointsText = '';
+  try {
+    const pts = JSON.parse((passage.candidate_question_points as string) || '[]') as Array<{ element: string; description: string; question_type: string }>;
+    if (pts.length > 0) {
+      candidatePointsText = pts.map(p => `- ${p.element} (${p.question_type}): ${p.description}`).join('\n');
+    }
+  } catch { /* ignore parse errors */ }
+
+  const genreAdaptation = typeof body.genre_adaptation === 'boolean' ? body.genre_adaptation : true;
 
   const job = createQuestionGenerateJob(
     finalPatterns as unknown as Parameters<typeof createQuestionGenerateJob>[0],
@@ -60,6 +71,9 @@ export async function POST(request: NextRequest) {
     passage.title as string,
     (passage.area as string) ?? '',
     (passage.key_points as string) ?? '',
+    (passage.analysis_summary as string) ?? '',
+    candidatePointsText,
+    genreAdaptation,
   );
 
   return NextResponse.json({ jobId: job.id });

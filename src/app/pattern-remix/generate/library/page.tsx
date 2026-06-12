@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { PatternBasedQuestionSet, PatternBasedQuestion } from "@/types/pattern-remix";
 import PdfDownloadButtons from "@/components/PdfDownloadButtons";
@@ -22,18 +22,26 @@ const TYPE_COLOR: Record<string, string> = {
 };
 
 function toPdfData(s: PatternBasedQuestionSet): PdfData {
-  return {
+  const base = {
     title: s.title,
     school: s.exam_pattern_sets?.school_name,
     grade: s.exam_pattern_sets?.grade,
     area: s.area,
     patternSetTitle: s.exam_pattern_sets?.title,
+    questions: s.generated_questions ?? [],
+    createdAt: s.created_at,
+  };
+  // 다중 지문 모드 (passages_json이 있고 2개 이상)
+  if (s.passages && s.passages.length > 1) {
+    return { ...base, passages: s.passages };
+  }
+  // 단일 지문 모드 (레거시)
+  return {
+    ...base,
     passageTitle: s.source_passages?.title,
     passageText: s.source_passages?.passage_text,
     passageImageUrls: s.source_passages?.image_urls,
     keyPoints: s.source_passages?.key_points,
-    questions: s.generated_questions ?? [],
-    createdAt: s.created_at,
   };
 }
 
@@ -43,6 +51,8 @@ export default function PBQLibraryPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [expandedQ, setExpandedQ] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name">("newest");
 
   useEffect(() => {
     fetch("/api/pattern-based-questions")
@@ -59,6 +69,24 @@ export default function PBQLibraryPage() {
     if (expanded === id) setExpanded(null);
   }
 
+  const filtered = useMemo(() => {
+    let list = sets;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(s =>
+        s.title.toLowerCase().includes(q) ||
+        (s.exam_pattern_sets?.title ?? "").toLowerCase().includes(q) ||
+        (s.source_passages?.title ?? "").toLowerCase().includes(q) ||
+        (s.area ?? "").toLowerCase().includes(q)
+      );
+    }
+    return [...list].sort((a, b) => {
+      if (sortBy === "oldest") return a.created_at.localeCompare(b.created_at);
+      if (sortBy === "name") return a.title.localeCompare(b.title, "ko");
+      return b.created_at.localeCompare(a.created_at);
+    });
+  }, [sets, search, sortBy]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -69,19 +97,55 @@ export default function PBQLibraryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-4 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/pattern-remix/generate" className="text-gray-400 hover:text-gray-600">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <div>
-            <h1 className="text-base font-bold text-gray-900">저장된 문제지</h1>
-            <p className="text-xs text-gray-400">생성한 문제지를 다운로드하거나 편집합니다</p>
+      <header className="bg-white border-b">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/pattern-remix/generate" className="text-gray-400 hover:text-gray-600">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </Link>
+            <div>
+              <h1 className="text-base font-bold text-gray-900">저장된 문제지</h1>
+              <p className="text-xs text-gray-400">생성한 문제지를 다운로드하거나 편집합니다</p>
+            </div>
           </div>
+          <span className="text-sm text-gray-500 font-medium">
+            {filtered.length !== sets.length ? `${filtered.length} / ` : ""}{sets.length}개
+          </span>
         </div>
-        <span className="text-sm text-gray-500 font-medium">{sets.length}개</span>
+        {sets.length > 2 && (
+          <div className="max-w-4xl mx-auto px-4 pb-3 flex gap-2">
+            <div className="relative flex-1">
+              <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="제목, 패턴, 지문으로 검색…"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:border-green-400 focus:ring-1 focus:ring-green-100 focus:bg-white"
+              />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as typeof sortBy)}
+              className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 text-gray-700 focus:outline-none focus:border-green-400"
+            >
+              <option value="newest">최신순</option>
+              <option value="oldest">오래된순</option>
+              <option value="name">이름순</option>
+            </select>
+          </div>
+        )}
       </header>
 
       <main className="max-w-4xl mx-auto p-6 space-y-4">
@@ -92,7 +156,14 @@ export default function PBQLibraryPage() {
               문제 생성하러 가기
             </Link>
           </div>
-        ) : sets.map(s => (
+        ) : filtered.length === 0 ? (
+          <div className="bg-white rounded-xl border p-8 text-center text-gray-400">
+            <p className="mb-2">검색 결과가 없습니다</p>
+            <button onClick={() => setSearch("")} className="text-sm text-green-600 hover:underline">
+              검색 초기화
+            </button>
+          </div>
+        ) : filtered.map(s => (
           <div key={s.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             {/* 헤더 */}
             <div className="p-4 flex items-start justify-between gap-3">
@@ -105,7 +176,9 @@ export default function PBQLibraryPage() {
                     패턴: {s.exam_pattern_sets?.title ?? s.pattern_set_id}
                   </span>
                   <span className="text-xs text-green-600">
-                    지문: {s.source_passages?.title ?? s.source_passage_id}
+                    {s.passages && s.passages.length > 1
+                      ? `지문 ${s.passages.length}개`
+                      : `지문: ${s.source_passages?.title ?? s.source_passage_id}`}
                   </span>
                   {s.area && <span className="text-xs text-gray-500">영역: {s.area}</span>}
                   <span className="text-xs text-gray-400">
@@ -115,8 +188,14 @@ export default function PBQLibraryPage() {
                 <p className="text-xs text-gray-500 mt-1">
                   문제 {s.generated_questions?.length ?? 0}개
                 </p>
-                <div className="mt-2">
+                <div className="mt-2 flex items-center gap-3 flex-wrap">
                   <PdfDownloadButtons data={toPdfData(s)} />
+                  <Link
+                    href={`/pattern-remix/generate?pattern=${s.pattern_set_id}`}
+                    className="text-xs text-gray-400 hover:text-green-600 transition-colors"
+                  >
+                    이 패턴으로 재생성 →
+                  </Link>
                 </div>
               </div>
               <div className="flex gap-2 shrink-0 flex-wrap justify-end">

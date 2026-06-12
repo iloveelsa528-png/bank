@@ -1,9 +1,4 @@
-import {
-  buildPdfSections,
-  buildFilename,
-  type PdfData,
-  type PdfMode,
-} from "./generate";
+import { buildFilename, type PdfData, type PdfMode } from "./generate";
 
 // ─── TXT 다운로드 ─────────────────────────────────────────────────────────────
 export function downloadTxt(data: PdfData) {
@@ -65,216 +60,28 @@ export function downloadTxt(data: PdfData) {
   URL.revokeObjectURL(url);
 }
 
-// ─── PDF 다운로드 (2단 컬럼 레이아웃) ────────────────────────────────────────
+// ─── PDF 다운로드 (서버 API → Playwright page.pdf) ────────────────────────────
 export async function downloadPdf(data: PdfData, mode: PdfMode) {
-  const { jsPDF } = await import("jspdf");
-  const { default: html2canvas } = await import("html2canvas");
+  const filename = buildFilename(data, mode);
 
-  // ── 페이지 레이아웃 상수 ───────────────────────────────────────────
-  const PAGE_W   = 210;   // mm
-  const PAGE_H   = 297;   // mm
-  const H_MARGIN = 10;    // mm (좌우 여백)
-  const V_MARGIN = 12;    // mm (상하 여백)
-  const COL_GAP  = 5;     // mm (2단 사이 간격)
-  const COL_W    = (PAGE_W - 2 * H_MARGIN - COL_GAP) / 2;  // 92.5mm
+  const res = await fetch("/api/pdf/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data, mode }),
+  });
 
-  // 각 컬럼의 x 좌표 (mm)
-  const COL_X = [H_MARGIN, H_MARGIN + COL_W + COL_GAP] as const;  // [10, 107.5]
-
-  // 렌더링 폭
-  const SCALE       = 2;
-  const FULL_W_PX   = 794;   // 전체 폭 섹션 (헤더·지문) 렌더 폭
-  const COL_W_PX    = Math.round(FULL_W_PX * COL_W / PAGE_W);  // ≈349px
-
-  // ── HTML → canvas ──────────────────────────────────────────────────
-  async function renderToCanvas(html: string, containerW: number): Promise<HTMLCanvasElement> {
-    const el = document.createElement("div");
-    el.style.cssText =
-      `position:absolute;left:-9999px;top:0;width:${containerW}px;` +
-      `background:#fff;z-index:99999;visibility:visible;overflow:visible;`;
-    el.innerHTML = html;
-    document.body.appendChild(el);
-
-    try {
-      // 폰트 로딩 + 레이아웃 완성까지 충분히 대기
-      await new Promise(r => requestAnimationFrame(r));
-      await new Promise(r => setTimeout(r, 150));
-
-      // 전체 높이를 명시적으로 측정 — 이 값을 html2canvas에 전달해야
-      // 긴 지문이 viewport 높이에서 잘리지 않고 완전히 캡처됨
-      const elH = el.scrollHeight;
-
-      const canvas = await html2canvas(el, {
-        scale: SCALE,
-        useCORS: true,
-        logging: false,
-        width:        containerW,
-        height:       elH,          // 전체 높이 명시 (기본값은 viewport 높이)
-        windowWidth:  containerW,
-        windowHeight: elH,          // html2canvas 내부 뷰포트도 동일하게 설정
-        scrollX: 0,
-        scrollY: 0,
-        backgroundColor: "#ffffff",
-      });
-
-      return canvas;
-    } finally {
-      document.body.removeChild(el);
-    }
+  if (!res.ok) {
+    const msg = await res.text().catch(() => res.statusText);
+    throw new Error(`PDF 생성 실패: ${msg}`);
   }
 
-  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
-  // ── canvas 슬라이스 ────────────────────────────────────────────────
-  function sliceImgData(canvas: HTMLCanvasElement, startPx: number, endPx: number): string {
-    const h = Math.max(1, endPx - startPx);
-    const slice = document.createElement("canvas");
-    slice.width  = canvas.width;
-    slice.height = h;
-    const ctx = slice.getContext("2d")!;
-    ctx.drawImage(canvas, 0, -startPx);
-    return slice.toDataURL("image/jpeg", 0.95);
-  }
-
-  // ── 2단 컬럼 상태 ──────────────────────────────────────────────────
-  let curCol = 0;                                          // 0=왼쪽, 1=오른쪽
-  let colTop = V_MARGIN;                                   // 현재 페이지 컬럼 시작 y
-  let colYs  = [V_MARGIN, V_MARGIN] as [number, number];  // 각 컬럼 현재 y
-
-  // 컬럼 구분선 그리기
-  function drawDivider() {
-    const lineX = H_MARGIN + COL_W + COL_GAP / 2;
-    pdf.setDrawColor(210, 210, 210);
-    pdf.setLineWidth(0.25);
-    pdf.line(lineX, V_MARGIN, lineX, PAGE_H - V_MARGIN);
-  }
-
-  // 새 페이지
-  function newPage() {
-    pdf.addPage();
-    curCol = 0;
-    colTop = V_MARGIN;
-    colYs  = [V_MARGIN, V_MARGIN];
-    drawDivider();
-  }
-
-  // 다음 컬럼 (오른쪽 → 새 페이지)
-  function nextCol() {
-    if (curCol === 0) {
-      curCol = 1;
-    } else {
-      newPage();
-    }
-  }
-
-  // ── 전체 폭 배치 (헤더·지문) ───────────────────────────────────────
-  // 현재 y에서 바로 시작 — 긴 지문도 현재 페이지에서 시작해 슬라이싱
-  // (사전 newPage 없음: 사전 newPage가 1페이지 공백 버그의 원인)
-  function placeFullWidth(canvas: HTMLCanvasElement) {
-    const pxPerMm = canvas.width / PAGE_W;
-    const totalMm = canvas.height / pxPerMm;
-
-    let y       = Math.max(colYs[0], colYs[1]);
-    let remMm   = totalMm;
-    let startPx = 0;
-
-    while (remMm > 0.5) {
-      const avail = PAGE_H - V_MARGIN - y;
-      if (avail <= 0.5) {
-        pdf.addPage();
-        y = V_MARGIN;
-        drawDivider();
-        continue;
-      }
-      const chunkMm = Math.min(remMm, avail);
-      const endPx   = Math.round(startPx + chunkMm * pxPerMm);
-
-      pdf.addImage(
-        sliceImgData(canvas, Math.round(startPx), endPx),
-        "JPEG", 0, y, PAGE_W, chunkMm
-      );
-
-      y       += chunkMm;
-      startPx  = endPx;
-      remMm   -= chunkMm;
-
-      if (remMm > 0.5) {
-        pdf.addPage();
-        y = V_MARGIN;
-        drawDivider();
-      }
-    }
-
-    // 두 컬럼 모두 이 섹션 바로 아래에서 시작
-    colTop = y;
-    colYs  = [y, y];
-    curCol = 0;
-  }
-
-  // ── 컬럼 배치 (문제) ───────────────────────────────────────────────
-  // 현재 컬럼에 안 들어가면 다음 컬럼으로, 새 페이지로 자동 전환
-  function placeInColumn(canvas: HTMLCanvasElement) {
-    const pxPerMm = canvas.width / COL_W;
-    const totalMm = canvas.height / pxPerMm;
-
-    // 문제 섹션이 현재 컬럼에 안 들어갈 때의 처리:
-    //   1) 현재 컬럼 부족 → 다음 컬럼으로
-    //   2) 다음 컬럼도 부족 → 새 페이지로
-    // (슬라이싱은 최후 수단 — 한 컬럼보다 큰 섹션만 허용)
-    const maxColH = PAGE_H - 2 * V_MARGIN;  // 273mm
-    if (totalMm <= maxColH) {
-      const avail0 = PAGE_H - V_MARGIN - colYs[curCol];
-      if (totalMm > avail0) {
-        nextCol();  // 오른쪽 컬럼으로
-        const avail1 = PAGE_H - V_MARGIN - colYs[curCol];
-        if (totalMm > avail1) {
-          newPage();  // 양쪽 다 부족 → 새 페이지
-        }
-      }
-    }
-
-    let remMm   = totalMm;
-    let startPx = 0;
-
-    while (remMm > 0.5) {
-      const avail = PAGE_H - V_MARGIN - colYs[curCol];
-      if (avail <= 0.5) {
-        nextCol();
-        continue;
-      }
-      const chunkMm = Math.min(remMm, avail);
-      const endPx   = Math.round(startPx + chunkMm * pxPerMm);
-
-      pdf.addImage(
-        sliceImgData(canvas, Math.round(startPx), endPx),
-        "JPEG", COL_X[curCol], colYs[curCol], COL_W, chunkMm
-      );
-
-      colYs[curCol] += chunkMm;
-      startPx  = endPx;
-      remMm   -= chunkMm;
-
-      if (remMm > 0.5) nextCol();
-    }
-  }
-
-  // ── 섹션 렌더링 및 배치 ────────────────────────────────────────────
-  // 첫 페이지 컬럼 구분선
-  drawDivider();
-
-  const sections = buildPdfSections(data, mode);
-
-  for (const sec of sections) {
-    const isFullWidth = sec.type === "header" || sec.type === "passage";
-    const containerW  = isFullWidth ? FULL_W_PX : COL_W_PX;
-    const canvas      = await renderToCanvas(sec.html, containerW);
-
-    if (isFullWidth) {
-      placeFullWidth(canvas);
-    } else {
-      placeInColumn(canvas);
-    }
-  }
-
-  pdf.save(buildFilename(data, mode));
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

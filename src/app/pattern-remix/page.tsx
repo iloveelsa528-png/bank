@@ -200,6 +200,7 @@ export default function PatternRemixPage() {
             <ExamResultView
               groups={(completedJob.result as { groups: Parameters<typeof ExamResultView>[0]["groups"] }).groups ?? []}
               jobId={completedJob.id}
+              segmentFailed={(completedJob.result as { segmentFailed?: boolean }).segmentFailed}
               onSaved={() => {}}
             />
             <button onClick={handleReset} className="text-xs text-gray-400 hover:text-gray-600 underline block">

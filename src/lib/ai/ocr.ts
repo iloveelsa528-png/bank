@@ -40,8 +40,8 @@ export async function runOcrChunk(localImagePath: string): Promise<OcrResult> {
   const mediaType = mediaTypeFromPath(absPath);
 
   const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 8192,
+    model: 'claude-sonnet-4-6',
+    max_tokens: 16000,
     system: `당신은 한국어 시험지 이미지 전문 OCR 엔진입니다.
 현대 한국어뿐 아니라 고어·옛표기(ㆍ아래아, ㆎ, ㅸ순경음비읍, ㆁ옛이응, ㅿ반치음 등)도 정확히 인식합니다.
 어떠한 설명·거절 없이 전사 텍스트만 출력합니다.`,
@@ -71,10 +71,11 @@ export async function runOcrChunk(localImagePath: string): Promise<OcrResult> {
 텍스트 처리:
 - 공백(스페이스)으로 시각적 정렬이나 들여쓰기를 하지 마세요 — 줄바꿈(\\n)만 사용합니다
 - 선택지(①②③④⑤)는 각각 새 줄에 출력합니다
-- 글자가 흐리거나 작아도 한국어 맥락으로 가장 가능성 높은 단어로 전사합니다
+- 읽기 어렵거나 불확실한 글자는 추측하지 말고 [불명확]으로 표시합니다. 원문에 없는 내용을 지어내서는 안 됩니다
+- 약간 흐리거나 작은 글자도 확실하게 읽히지 않으면 [불명확]으로 표시합니다. 그럴듯한 단어로 채우지 마세요
 - 고어·옛표기 문자(ㆍ ㆎ ㅸ ㆁ ㅿ 등)는 현대어로 바꾸지 말고 원문 그대로 전사합니다
 - 고어 지문이 있는 경우 현대어 번역이나 주석 없이 원문만 적습니다
-- 완전히 잘려 읽을 수 없는 부분만 [잘림]으로 표시합니다
+- 완전히 잘려 읽을 수 없는 부분은 [잘림]으로 표시합니다
 - ① ② ③ ④ ⑤ 기호는 그대로 유지합니다
 - 전사 텍스트만 반환하고 설명은 절대 덧붙이지 않습니다`,
         },
@@ -88,7 +89,7 @@ export async function runOcrChunk(localImagePath: string): Promise<OcrResult> {
   return {
     output: { text },
     usage: {
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-6',
       input_tokens: response.usage.input_tokens,
       output_tokens: response.usage.output_tokens,
     },

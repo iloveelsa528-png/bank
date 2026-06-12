@@ -80,6 +80,9 @@ function initSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_question_sets_pattern ON question_sets(pattern_set_id);
     CREATE INDEX IF NOT EXISTS idx_question_sets_passage ON question_sets(source_passage_id);
   `);
+
+  // 마이그레이션: 다중 지문 지원 컬럼 추가
+  try { db.exec(`ALTER TABLE question_sets ADD COLUMN passages_json TEXT;`); } catch { /* 이미 존재 */ }
 }
 
 export function parseJSON<T = unknown>(text: string | null | undefined, fallback: T): T {
