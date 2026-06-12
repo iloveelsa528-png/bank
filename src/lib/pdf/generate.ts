@@ -534,14 +534,28 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
 
     // 지문 — 수능 스타일: 얇은 단색 테두리, 내부 여백 / 구조 레이블([가][대] 등) 제거
     const cleanPassText = g.text ? stripStructuralLabels(g.text) : '';
-    // escape 먼저, 그 다음 (가)(나) 마커를 굵게 강조 (HTML 안전)
-    const styledPassHtml = escapeHtml(cleanPassText)
-      .replace(/\(([가나다라마바사아자차카타파하])\)/g,
-        '<b style="font-size:10.5pt;letter-spacing:0.5px;">($1)</b>');
+    // 문단 단위 분리 — break-inside:avoid 없이 orphans/widows 로만 제어
+    // (가)/(나) 단독 섹션 마커만 break-after:avoid 로 다음 문단과 묶음
+    const passParasHtml = cleanPassText
+      ? cleanPassText.split(/\n{2,}/)
+          .filter(p => p.trim().length > 0)
+          .map(p => {
+            const trimmed = p.trim();
+            const styled = escapeHtml(trimmed)
+              .replace(/\(([가나다라마바사아자차카타파하])\)/g,
+                '<b style="font-size:10.5pt;letter-spacing:0.5px;">($1)</b>');
+            const isSectionMarker = /^\(?[가나다라마바사아자차카타파하]\)?$/.test(trimmed);
+            const breakStyle = isSectionMarker
+              ? 'break-after:avoid;margin-bottom:0.25em;'
+              : 'margin-bottom:0.6em;';
+            return `<p style="font-size:10pt;line-height:1.95;white-space:pre-wrap;word-break:keep-all;${breakStyle}">${styled}</p>`;
+          })
+          .join("")
+      : "";
     const passBox = hasPass
       ? `<div style="border:1px solid #555;margin-bottom:10px;padding:9px 13px 11px;">
            ${imgs}
-           ${styledPassHtml ? `<p style="font-size:10pt;line-height:1.95;white-space:pre-wrap;word-break:keep-all;">${styledPassHtml}</p>` : ""}
+           ${passParasHtml}
            ${kp}
          </div>`
       : "";
@@ -554,10 +568,8 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
     return `${sepHtml}${directive}${passBox}${questionsHtml}<div style="height:8px;"></div>`;
   }).join("");
 
-  // ── 단일 2단 컬럼 래퍼 — column-fill:auto 로 좌→우→다음 페이지 순 채움 ──────
-  const columnsHtml = `<div style="column-count:2;column-gap:22px;column-rule:1px solid #999;column-fill:auto;orphans:2;widows:2;">
-    ${contentHtml}
-  </div>`;
+  // body 자체가 2단 컨테이너 — contentHtml을 직접 삽입
+  const columnsHtml = contentHtml;
 
   // ── 정답표 (교사용·전체본) ─────────────────────────────────────────────────
   const answerTable = showAnswerInfo ? (() => {
@@ -582,6 +594,7 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
 
   return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"/>
     <style>
+      @page{size:A4;}
       *{box-sizing:border-box;margin:0;padding:0;}
       body,table,td,p,span,div,b,strong{
         font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕','Noto Sans KR',
@@ -591,37 +604,41 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
         font-size:10pt;color:#000;background:#fff;line-height:1.75;
         word-break:keep-all;overflow-wrap:break-word;
         -webkit-print-color-adjust:exact;print-color-adjust:exact;
+        padding:4mm 14mm 3mm;
+        column-count:2;column-gap:22px;column-rule:1px solid #999;
+        column-fill:auto;orphans:3;widows:3;
       }
       p{margin:0;padding:0;}
     </style>
     </head><body>
-    <div style="padding:9mm 14mm 13mm;">
 
-      <!-- 상단 정보 (학교·학년·날짜) -->
-      <p style="font-size:8.5pt;color:#444;text-align:center;margin-bottom:4px;letter-spacing:0.3px;">
-        ${topInfoHtml}
-      </p>
+      <!-- 헤더: column-span:all 로 전체 폭 유지 -->
+      <div style="column-span:all;margin-bottom:12px;">
+        <!-- 상단 정보 (학교·학년·날짜) -->
+        <p style="font-size:8.5pt;color:#444;text-align:center;margin-bottom:4px;letter-spacing:0.3px;">
+          ${topInfoHtml}
+        </p>
 
-      <!-- 대제목 행 -->
-      <table style="width:100%;border-collapse:collapse;margin-bottom:3px;">
-        <tr style="vertical-align:bottom;">
-          <td style="font-size:22pt;font-weight:900;letter-spacing:-0.5px;line-height:1.1;">
-            ${escapeHtml(area)}
-          </td>
-          <td style="text-align:right;font-size:9pt;color:#333;padding-bottom:3px;">
-            <b style="font-size:10pt;">${escapeHtml(modeLabel)}</b>
-          </td>
-        </tr>
-      </table>
+        <!-- 대제목 행 -->
+        <table style="width:100%;border-collapse:collapse;margin-bottom:3px;">
+          <tr style="vertical-align:bottom;">
+            <td style="font-size:22pt;font-weight:900;letter-spacing:-0.5px;line-height:1.1;">
+              ${escapeHtml(area)}
+            </td>
+            <td style="text-align:right;font-size:9pt;color:#333;padding-bottom:3px;">
+              <b style="font-size:10pt;">${escapeHtml(modeLabel)}</b>
+            </td>
+          </tr>
+        </table>
 
-      <!-- 이중 구분선 (수능 스타일) -->
-      <div style="border-top:3.5px solid #000;margin-bottom:2px;"></div>
-      <div style="border-top:1px solid #000;margin-bottom:12px;"></div>
+        <!-- 이중 구분선 (수능 스타일) -->
+        <div style="border-top:3.5px solid #000;margin-bottom:2px;"></div>
+        <div style="border-top:1px solid #000;"></div>
+      </div>
 
       ${columnsHtml}
-      ${answerTable}
+      ${answerTable ? `<div style="column-span:all;">${answerTable}</div>` : ""}
 
-    </div>
     </body></html>`;
 }
 
