@@ -396,6 +396,19 @@ function parseRefBox(text: string): ParsedBoxResult | null {
     }
   }
 
+  // ── 범용 한글 대괄호 라벨 (4~25자, 독립형) ────────────────────────────────
+  // [그림A] 등 이미지 슬롯: Latin 문자 포함 → char class 불일치로 자동 제외
+  // [보기]/[자료] 등 기존 라벨: 2자라서 {3,24} 불만족 → 자동 제외 (중복 없음)
+  const genericLabelRe = /\[[가-힣][가-힣\s·\/\(\)\-]{3,24}\]/g;
+  genericLabelRe.lastIndex = 0;
+  let glm: RegExpExecArray | null;
+  while ((glm = genericLabelRe.exec(text)) !== null) {
+    if (isStandalone(glm.index)) {
+      const inner = glm[0].slice(1, -1); // 대괄호 안 텍스트 → 박스 헤더로 사용
+      markers.push({ idx: glm.index, endIdx: glm.index + glm[0].length, label: inner });
+    }
+  }
+
   // ── 큰따옴표 인용문 (20자 이상, 독립형) ──────────────────────────────────
   const quoteRe = /"([^"]{20,})"/g;
   let qm: RegExpExecArray | null;
@@ -438,13 +451,6 @@ function parseRefBox(text: string): ParsedBoxResult | null {
 // ─── 통합 HTML (수능/모의고사 형식 2단 레이아웃) ─────────────────────────────
 export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
   const showAnswerInfo = mode !== "student";
-  const modeLabel = mode === "student" ? "학생용" : mode === "teacher" ? "교사용" : "전체본";
-  const date = data.createdAt
-    ? new Date(data.createdAt).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" })
-    : today();
-  const school = data.school ?? "";
-  const grade  = data.grade  ?? "";
-  const area   = data.area   ? `${data.area} 영역` : "국어 영역";
 
   // ── 발문/선택지 내 참조 표기 정규화 + OCR 구조 레이블 제거 ──────────────
   function normalizeRefs(t: string): string {
@@ -655,12 +661,7 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
     </div>`;
   })() : "";
 
-  // ── 상단 정보 행 (각 파트를 개별 escape 후 HTML 엔티티로 join) ────────────
-  const topInfoHtml = [school, grade, date]
-    .filter(Boolean)
-    .map(s => escapeHtml(s))
-    .join("&nbsp;&nbsp;&nbsp;");
-
+  // 헤더는 Playwright headerTemplate으로 이동 — body는 2단 컨테이너만
   return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"/>
     <style>
       @page{size:A4;}
@@ -673,40 +674,23 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
         font-size:10pt;color:#000;background:#fff;line-height:1.75;
         word-break:keep-all;overflow-wrap:break-word;
         -webkit-print-color-adjust:exact;print-color-adjust:exact;
-        padding:4mm 14mm 3mm;
-        column-count:2;column-gap:22px;column-rule:1px solid #999;
-        column-fill:auto;orphans:3;widows:3;
+        padding:2mm 14mm 3mm;
       }
       p{margin:0;padding:0;}
     </style>
     </head><body>
 
-      <!-- 헤더: column-span:all 로 전체 폭 유지 -->
-      <div style="column-span:all;margin-bottom:12px;">
-        <!-- 상단 정보 (학교·학년·날짜) -->
-        <p style="font-size:8.5pt;color:#444;text-align:center;margin-bottom:4px;letter-spacing:0.3px;">
-          ${topInfoHtml}
-        </p>
+      <!-- 세로 구분선: position:fixed → print 모드에서 매 페이지마다 렌더링
+           top:28mm / bottom:10mm 은 route.ts Playwright margin.top/bottom 과 일치해야 함 -->
+      <div style="position:fixed;left:calc(50% - 0.5px);top:28mm;bottom:10mm;
+                  width:1px;background:#999;
+                  -webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
 
-        <!-- 대제목 행 -->
-        <table style="width:100%;border-collapse:collapse;margin-bottom:3px;">
-          <tr style="vertical-align:bottom;">
-            <td style="font-size:22pt;font-weight:900;letter-spacing:-0.5px;line-height:1.1;">
-              ${escapeHtml(area)}
-            </td>
-            <td style="text-align:right;font-size:9pt;color:#333;padding-bottom:3px;">
-              <b style="font-size:10pt;">${escapeHtml(modeLabel)}</b>
-            </td>
-          </tr>
-        </table>
-
-        <!-- 이중 구분선 (수능 스타일) -->
-        <div style="border-top:3.5px solid #000;margin-bottom:2px;"></div>
-        <div style="border-top:1px solid #000;"></div>
+      <!-- 2단 컨테이너 — 모든 페이지에서 동일한 위치에서 시작 (헤더는 headerTemplate에) -->
+      <div style="column-count:2;column-gap:22px;column-fill:auto;orphans:3;widows:3;">
+        ${columnsHtml}
+        ${answerTable ? `<div style="column-span:all;">${answerTable}</div>` : ""}
       </div>
-
-      ${columnsHtml}
-      ${answerTable ? `<div style="column-span:all;">${answerTable}</div>` : ""}
 
     </body></html>`;
 }

@@ -54,12 +54,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '지문 텍스트가 없습니다.' }, { status: 400 });
   }
 
-  // candidate_question_points는 JSON 배열 → 텍스트로 변환
-  let candidatePointsText = '';
+  // 출제 포인트를 문제마다 1:1 배정 (포인트 수 < 문제 수면 round-robin)
   try {
     const pts = JSON.parse((passage.candidate_question_points as string) || '[]') as Array<{ element: string; description: string; question_type: string }>;
     if (pts.length > 0) {
-      candidatePointsText = pts.map(p => `- ${p.element} (${p.question_type}): ${p.description}`).join('\n');
+      for (let i = 0; i < finalPatterns.length; i++) {
+        const pt = pts[i % pts.length];
+        finalPatterns[i] = {
+          ...finalPatterns[i],
+          assignedCandidatePoint: `${pt.element} (${pt.question_type}): ${pt.description}`,
+        };
+      }
     }
   } catch { /* ignore parse errors */ }
 
@@ -72,7 +77,7 @@ export async function POST(request: NextRequest) {
     (passage.area as string) ?? '',
     (passage.key_points as string) ?? '',
     (passage.analysis_summary as string) ?? '',
-    candidatePointsText,
+    '',
     genreAdaptation,
   );
 

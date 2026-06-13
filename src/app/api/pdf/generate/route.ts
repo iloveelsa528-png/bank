@@ -56,11 +56,18 @@ export async function POST(request: NextRequest) {
   const html = buildUnifiedHtml(resolvedData, mode);
   const filename = buildFilename(data, mode);
 
-  // 헤더 텍스트 (XSS 방지용 간단 escape)
+  // 헤더 구성 요소 — 모든 페이지에 동일하게 표시되는 Playwright headerTemplate용
   const esc = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const headerArea = esc(data.area ? `${data.area} 영역` : "국어 영역");
-  const headerMeta = esc([data.school, data.grade].filter(Boolean).join("  "));
+  const area      = esc(data.area ? `${data.area} 영역` : "국어 영역");
+  const modeLabel = esc(mode === "student" ? "학생용" : mode === "teacher" ? "교사용" : "전체본");
+  const date      = data.createdAt
+    ? new Date(data.createdAt).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\. /g, "-").replace(".", "")
+    : new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\. /g, "-").replace(".", "");
+  const topInfoHtml = [data.school, data.grade, date]
+    .filter((s): s is string => !!s)
+    .map(esc)
+    .join("&nbsp;&nbsp;&nbsp;");
 
   const { chromium } = await import("playwright");
   const browser = await chromium.launch({ headless: true });
@@ -74,16 +81,28 @@ export async function POST(request: NextRequest) {
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
-      margin: { top: "12mm", right: "0", bottom: "10mm", left: "0" },
+      // margin.top은 headerTemplate 높이를 수용할 만큼 확보 (헤더 약 22mm + 여유 6mm)
+      margin: { top: "28mm", right: "0", bottom: "10mm", left: "0" },
       displayHeaderFooter: true,
+      // 수능 스타일 전체 헤더 — 모든 페이지 동일 위치 → 단 높이 균일
       headerTemplate: `<div style="
-          font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕','Noto Sans KR',sans-serif;
-          font-size:7.5pt;color:#333;line-height:1.3;
-          width:100%;padding:4px 14mm 4px;box-sizing:border-box;
-          display:flex;justify-content:space-between;align-items:center;
-          border-bottom:1px solid #aaa;">
-        <span>${headerArea}</span>
-        <span style="letter-spacing:0.3px;">${headerMeta}</span>
+          font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕','Noto Sans KR','NanumGothic',sans-serif;
+          width:100%;padding:3px 14mm 0;box-sizing:border-box;">
+        <p style="font-size:8.5pt;color:#444;text-align:center;margin:0 0 3px;letter-spacing:0.3px;">
+          ${topInfoHtml}
+        </p>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:3px;">
+          <tr style="vertical-align:bottom;">
+            <td style="font-size:22pt;font-weight:900;letter-spacing:-0.5px;line-height:1.1;color:#000;">
+              ${area}
+            </td>
+            <td style="text-align:right;font-size:9pt;color:#333;padding-bottom:3px;">
+              <b style="font-size:10pt;">${modeLabel}</b>
+            </td>
+          </tr>
+        </table>
+        <div style="border-top:3.5px solid #000;margin-bottom:2px;"></div>
+        <div style="border-top:1px solid #000;"></div>
       </div>`,
       footerTemplate: `<div style="font-size:8.5pt;color:#555;width:100%;
         padding:3px 14mm 0;box-sizing:border-box;
