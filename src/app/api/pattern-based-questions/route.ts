@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, parseJSON, stringifyJSON } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import type { PatternBasedQuestion } from '@/types/pattern-remix';
+import { sanitizeChoices } from '@/lib/choices';
 
 function buildQuestionSet(row: Record<string, unknown>, db: ReturnType<typeof getDb>) {
   const ps = db.prepare('SELECT title, school_name, grade FROM pattern_sets WHERE id = ?').get(row.pattern_set_id as string) as Record<string, unknown> | undefined;
@@ -56,7 +57,10 @@ export async function POST(request: NextRequest) {
       title.trim(),
       pattern_set_id,
       source_passage_id,
-      stringifyJSON(generated_questions ?? []),
+      stringifyJSON((generated_questions ?? []).map(q => ({
+        ...q,
+        choices: sanitizeChoices(q.question_text, q.choices),
+      }))),
       difficulty ?? '',
       area ?? '',
       source_job_id ?? null,

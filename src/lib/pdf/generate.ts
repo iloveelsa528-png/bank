@@ -1,5 +1,6 @@
 import type { PatternBasedQuestion } from "@/types/pattern-remix";
 import type { ImageSlot } from "@/types/passages";
+import { CIRCLE, isChoicesDuplicated } from "@/lib/choices";
 
 export type PdfMode = "student" | "teacher" | "full";
 
@@ -33,8 +34,6 @@ export interface PdfSection {
   type: "header" | "passage" | "question";
   html: string;
 }
-
-const CIRCLE = ["①", "②", "③", "④", "⑤"];
 
 function escapeHtml(s: string | undefined | null): string {
   if (!s) return "";
@@ -509,11 +508,7 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
     // 중복 탐지: q.question_text에 choices 본문이 이미 전부 포함된 경우
     // (자료/보기 박스 안에 ①~⑤ 항목이 저장됐고 choices에도 동일 텍스트가 중복 저장된 유형)
     // Q10처럼 기호 1글자뿐인 choices는 length>=10 필터로 제외해 이 분기에 걸리지 않음
-    function normCmp(s: string) { return s.trim().replace(/\s+/g, ' '); }
-    const qtNorm = normCmp(q.question_text);
-    const choicesAreDuplicated =
-      q.choices.length >= 2 &&
-      q.choices.every(c => { const t = normCmp(c.text); return t.length >= 10 && qtNorm.includes(t); });
+    const choicesAreDuplicated = isChoicesDuplicated(q.question_text, q.choices);
 
     const choices = q.choices.length > 0
       ? `<div style="margin-top:6px;">` +
