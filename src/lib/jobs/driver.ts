@@ -1,5 +1,6 @@
 import { createJob } from '@/lib/jobs/store';
 import { runExamPipeline } from '@/lib/processing/exam';
+import { runExamTextPipeline } from '@/lib/processing/exam-text';
 import { runPassagePipeline } from '@/lib/processing/passage';
 import { runQuestionsPipeline } from '@/lib/processing/questions';
 import { splitPassageIntoWindows } from '@/lib/ai/passage';
@@ -17,6 +18,20 @@ export function createExamOcrJob(localImagePaths: string[], uploadFolderId: stri
   );
   runExamPipeline(job.id, localImagePaths).catch(err =>
     console.error('[exam pipeline error]', err),
+  );
+  return job;
+}
+
+// 텍스트 레이어가 있는 PDF용 — OCR 없이 바로 segment → analyze
+export function createExamTextJob(extractedText: string, uploadFolderId: string): Job {
+  // total_chunks = OCR 대체(1) + segment(1) + analyze(미정, 후에 갱신됨)
+  const job = createJob(
+    'exam_ocr_analyze',
+    { uploadFolderId, sourceType: 'text_pdf' },
+    3,
+  );
+  runExamTextPipeline(job.id, extractedText).catch(err =>
+    console.error('[exam text pipeline error]', err),
   );
   return job;
 }

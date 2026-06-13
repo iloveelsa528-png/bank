@@ -41,7 +41,8 @@ export async function runPassageAnalyzeChunk(
   const response = await client.messages.parse({
     model: 'claude-sonnet-4-6',
     max_tokens: 3000,
-    system: `당신은 국어 교육 전문가로, 지문을 분석하여 내신 대비 문제 출제 가능 요소를 파악합니다. 영역(${area || '국어'})과 출처 유형(${sourceType || '일반'})을 고려해 분석하세요.`,
+    system: `당신은 국어 교육 전문가로, 지문을 분석하여 내신 대비 문제 출제 가능 요소를 파악합니다. 영역(${area || '국어'})과 출처 유형(${sourceType || '일반'})을 고려해 분석하세요.
+입력 텍스트에 ①②③④⑤ 선택지, "12." 같은 발문 번호, "[11~14] 다음 글을 읽고" 같은 지시문이 섞여 있더라도 무시하고, 지문 본문 내용만을 기준으로 분석하세요.`,
     messages: [{
       role: 'user',
       content: `다음 지문을 분석하여 내신 대비 출제 가능 요소를 추출하세요.

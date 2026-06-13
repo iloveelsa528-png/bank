@@ -87,9 +87,19 @@ export default function SourcePassagesPage() {
   const [saving, setSaving]   = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError]     = useState("");
+  const [saveAllProgress, setSaveAllProgress] = useState<{
+    current: number; total: number; analyzing: boolean;
+  } | null>(null);
 
   const analysisReady = !!analysisSummary;
   const examJobDone   = examGroups !== null;
+
+  // text mode 경고: ①②③④⑤ 선택지 또는 "12." 같은 발문 번호가 감지되면 true
+  const hasSuspectedQuestion = mode === "text" && passageText.trim().length > 0 && (() => {
+    const choiceRe = /^[①②③④⑤]/m;
+    const questionNumRe = /^\d{1,2}\./m;
+    return choiceRe.test(passageText) || questionNumRe.test(passageText);
+  })();
 
   const autoTitle = passageText.trim()
     ? passageText.trim().split("\n").find(l => l.trim())?.slice(0, 30) ?? "지문"
@@ -102,18 +112,24 @@ export default function SourcePassagesPage() {
     setExamJobId(null); setExamGroups(null); setExamSegmentFailed(false); setSelectedGroupIdx(null);
   };
 
+  const isPdf = (f: File) =>
+    f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
+
+  const allowedFile = (f: File) => f.type.startsWith("image/") || isPdf(f);
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"));
+    const files = Array.from(e.dataTransfer.files).filter(allowedFile);
     setImages(prev => [...prev, ...files].slice(0, 20));
     resetExamState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []).filter(f => f.type.startsWith("image/"));
+    const files = Array.from(e.target.files ?? []).filter(allowedFile);
     setImages(prev => [...prev, ...files].slice(0, 20));
     resetExamState();
+    e.target.value = "";
   };
 
   // OCR → Segment → Analyze 파이프라인 시작
@@ -271,6 +287,74 @@ export default function SourcePassagesPage() {
     }
   };
 
+  const handleSaveAll = async () => {
+    if (!examGroups || examGroups.length === 0) return;
+    const total = examGroups.length;
+    setSaveAllProgress({ current: 0, total, analyzing: true });
+    setError("");
+
+    for (let i = 0; i < examGroups.length; i++) {
+      const group = examGroups[i];
+      const content = group.passageContent ?? "";
+      if (!content.trim()) {
+        setSaveAllProgress({ current: i + 1, total, analyzing: i + 1 < total });
+        continue;
+      }
+
+      const firstLine = content.trim().split("\n").find(l => l.trim())?.slice(0, 30) ?? "지문";
+      const groupTitle = group.passageTitle || group.passageGroupLabel || firstLine;
+      const groupArea = group.area || area;
+
+      // 분석 단계
+      setSaveAllProgress({ current: i, total, analyzing: true });
+      let analysisResult: {
+        analysis_summary: string;
+        key_points: string;
+        candidate_question_points: CandidateQuestionPoint[];
+      } = { analysis_summary: "", key_points: "", candidate_question_points: [] };
+
+      try {
+        const analyzeRes = await fetch("/api/source-passages/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ passage_text: content, area: groupArea, source_type: sourceType }),
+        });
+        if (analyzeRes.ok) {
+          const data = await analyzeRes.json();
+          analysisResult = {
+            analysis_summary: data.analysis_summary ?? "",
+            key_points: data.key_points ?? "",
+            candidate_question_points: data.candidate_question_points ?? [],
+          };
+        }
+      } catch (e) {
+        console.error(`그룹 ${i + 1} 분석 실패 (본문만 저장):`, e);
+      }
+
+      // 저장 단계
+      try {
+        const res = await fetch("/api/source-passages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: groupTitle, area: groupArea, source_type: sourceType,
+            passage_text: content, ocr_raw_text: ocrRaw,
+            ...analysisResult,
+            image_urls: [],
+            ...(sourceJobId ? { source_job_id: sourceJobId } : {}),
+          }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || "저장 실패");
+      } catch (e) {
+        console.error(`그룹 ${i + 1} 저장 실패:`, e);
+      }
+
+      setSaveAllProgress({ current: i + 1, total, analyzing: i + 1 < total });
+    }
+
+    setTimeout(() => router.push("/pattern-remix/generate"), 1800);
+  };
+
   const handleReset = () => {
     setImages([]);
     setExamJobRunning(false); resetExamState();
@@ -299,7 +383,7 @@ export default function SourcePassagesPage() {
           </Link>
           <div className="flex-1 min-w-0">
             <h1 className="text-sm font-bold text-gray-900">2단계 — 새 지문 입력</h1>
-            <p className="text-xs text-gray-400">출제할 지문을 사진 또는 텍스트로 등록합니다</p>
+            <p className="text-xs text-gray-400">출제할 지문을 사진·PDF 또는 텍스트로 등록합니다</p>
           </div>
           <Link href="/pattern-remix/generate"
             className="flex-shrink-0 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 transition-colors">
@@ -343,7 +427,7 @@ export default function SourcePassagesPage() {
               className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                 mode === m ? "bg-green-600 text-white" : "text-gray-500 hover:text-gray-700"
               }`}>
-              {m === "image" ? "📷  사진으로 입력" : "⌨  텍스트 직접 입력"}
+              {m === "image" ? "📷  사진·PDF 입력" : "⌨  텍스트 직접 입력"}
             </button>
           ))}
         </div>
@@ -353,7 +437,7 @@ export default function SourcePassagesPage() {
           <>
             {/* 이미지 업로드 카드 */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col gap-3">
-              <p className="text-sm font-bold text-gray-800">지문 사진 업로드</p>
+              <p className="text-sm font-bold text-gray-800">지문 사진·PDF 업로드</p>
               {images.length === 0 ? (
                 <div
                   onDrop={handleDrop}
@@ -363,19 +447,32 @@ export default function SourcePassagesPage() {
                   <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                   </svg>
-                  <p className="text-sm text-gray-500 font-medium">여기를 눌러 사진을 선택하세요</p>
-                  <p className="text-xs text-gray-400">드래그해서 올려도 됩니다 · 최대 20장</p>
+                  <p className="text-sm text-gray-500 font-medium">여기를 눌러 사진 또는 PDF를 선택하세요</p>
+                  <p className="text-xs text-gray-400">드래그해서 올려도 됩니다 · 이미지 최대 20장, PDF 1개</p>
                 </div>
               ) : (
                 <div onDrop={handleDrop} onDragOver={e => e.preventDefault()} className="flex flex-col gap-2">
                   {images.map((f, i) => (
                     <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={URL.createObjectURL(f)} alt={f.name}
-                        className="w-12 h-12 object-cover rounded-lg border border-gray-200 flex-shrink-0" />
+                      {isPdf(f) ? (
+                        /* PDF 파일 — 썸네일 없이 문서 아이콘 표시 */
+                        <div className="w-12 h-12 rounded-lg border border-red-200 bg-red-50 flex items-center justify-center flex-shrink-0">
+                          <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                              d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      ) : (
+                        /* 이미지 파일 — 기존 썸네일 그대로 */
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={URL.createObjectURL(f)} alt={f.name}
+                          className="w-12 h-12 object-cover rounded-lg border border-gray-200 flex-shrink-0" />
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-gray-800 truncate">{f.name}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{i + 1}페이지 · {fmtSize(f.size)}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {isPdf(f) ? "PDF 파일" : `${i + 1}페이지`} · {fmtSize(f.size)}
+                        </p>
                         {examJobDone && i === 0 && (
                           <span className="text-xs text-green-600">✓ 분석 완료</span>
                         )}
@@ -393,11 +490,11 @@ export default function SourcePassagesPage() {
                   <button
                     onClick={() => document.getElementById("passage-file-input")?.click()}
                     className="py-2 rounded-xl border-2 border-dashed border-gray-200 text-xs text-gray-400 hover:border-green-300 hover:text-green-500 transition-colors">
-                    + 사진 더 추가하기 ({images.length}/20)
+                    + 파일 더 추가하기 ({images.length}/20)
                   </button>
                 </div>
               )}
-              <input id="passage-file-input" type="file" multiple accept="image/*" className="hidden" onChange={handleFileInput} />
+              <input id="passage-file-input" type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={handleFileInput} />
 
               {/* 분석 시작 버튼 또는 진행률 */}
               {!examJobId ? (
@@ -445,7 +542,7 @@ export default function SourcePassagesPage() {
                 <div>
                   <p className="text-sm font-bold text-gray-800">지문 그룹 선택</p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {examGroups.length}개의 지문 그룹을 찾았습니다. 등록할 지문 하나를 선택하세요.
+                    {examGroups.length}개의 지문 그룹을 찾았습니다. 하나를 골라 분석·저장하거나, 전체를 한 번에 저장할 수 있습니다.
                   </p>
                 </div>
 
@@ -495,6 +592,45 @@ export default function SourcePassagesPage() {
                     );
                   })}
                 </div>
+
+                {/* 전체 저장 버튼 / 저장 진행 상태 */}
+                <div className="border-t border-gray-100 pt-3">
+                  {saveAllProgress !== null ? (
+                    <div className="bg-green-50 border border-green-200 rounded-xl px-3 py-3 flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-green-700">
+                          {saveAllProgress.current >= saveAllProgress.total
+                            ? `전체 ${saveAllProgress.total}개 분석·저장 완료! 이동 중…`
+                            : saveAllProgress.analyzing
+                              ? `${saveAllProgress.total}개 중 ${saveAllProgress.current + 1}번째 분석·저장 중…`
+                              : `${saveAllProgress.total}개 중 ${saveAllProgress.current}개 완료…`
+                          }
+                        </span>
+                        <span className="text-green-500 font-bold">
+                          {saveAllProgress.current}/{saveAllProgress.total}
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-green-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-green-500 rounded-full transition-all duration-300"
+                          style={{ width: `${(saveAllProgress.current / saveAllProgress.total) * 100}%` }}
+                        />
+                      </div>
+                      {saveAllProgress.analyzing && saveAllProgress.current < saveAllProgress.total && (
+                        <p className="text-xs text-green-500">요약 + 출제 포인트 생성 중… (지문당 20~40초)</p>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleSaveAll}
+                      className="w-full py-2.5 rounded-xl border-2 border-green-300 text-sm font-bold text-green-700 bg-green-50 hover:bg-green-100 transition-colors">
+                      전체 {examGroups.length}개 지문 분석·저장
+                    </button>
+                  )}
+                  <p className="text-xs text-gray-400 text-center mt-1.5">
+                    지문마다 요약·출제 포인트를 자동 생성 후 저장합니다 (지문당 20~40초)
+                  </p>
+                </div>
               </div>
             )}
           </>
@@ -520,6 +656,21 @@ export default function SourcePassagesPage() {
             rows={mode === "text" ? 10 : 8}
             className="w-full resize-y border border-gray-200 rounded-xl p-3 text-sm text-gray-800 placeholder:text-gray-400 leading-relaxed focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
           />
+
+          {/* text mode 경고: 선택지·발문 번호 감지 시 */}
+          {hasSuspectedQuestion && (
+            <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-300 rounded-xl">
+              <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                선택지(①②③④⑤)나 발문 번호가 감지됩니다.
+                지문 본문만 입력하면 더 정확한 분석이 가능합니다.
+                <br />
+                <span className="text-amber-600">저장은 가능하지만, 문제·선택지를 제외한 지문만 남기는 것을 권장합니다.</span>
+              </p>
+            </div>
+          )}
 
           {/* 분석 버튼:
               text mode → 항상 노출

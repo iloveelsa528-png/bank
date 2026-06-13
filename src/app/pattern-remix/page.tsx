@@ -23,14 +23,20 @@ export default function PatternRemixPage() {
     if (saved) setExamJobId(saved);
   }, []);
 
+  const isPdf = (f: File) =>
+    f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
+
+  const allowedFile = (f: File) => f.type.startsWith("image/") || isPdf(f);
+
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []).filter(f => f.type.startsWith("image/"));
+    const files = Array.from(e.target.files ?? []).filter(allowedFile);
     setImages(prev => [...prev, ...files].slice(0, 30));
+    e.target.value = "";
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"));
+    const files = Array.from(e.dataTransfer.files).filter(allowedFile);
     setImages(prev => [...prev, ...files].slice(0, 30));
   };
 
@@ -76,7 +82,7 @@ export default function PatternRemixPage() {
             </Link>
             <div>
               <h1 className="text-base font-bold text-gray-900">1단계 — 기출 시험지 넣기</h1>
-              <p className="text-xs text-gray-400">시험지 사진 → AI가 문항 패턴 자동 분석</p>
+              <p className="text-xs text-gray-400">시험지 사진·PDF → AI가 문항 패턴 자동 분석</p>
             </div>
           </div>
           <Link
@@ -107,24 +113,37 @@ export default function PatternRemixPage() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-700">시험지 사진을 여기에 올려주세요</p>
-                  <p className="text-xs text-gray-400 mt-1">클릭하거나 드래그 · JPG, PNG · 최대 30장</p>
+                  <p className="text-sm font-semibold text-gray-700">시험지 사진 또는 PDF를 올려주세요</p>
+                  <p className="text-xs text-gray-400 mt-1">클릭하거나 드래그 · JPG, PNG, PDF · 이미지 최대 30장, PDF 1개</p>
                 </div>
               </div>
             ) : (
               <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700 mb-2">선택된 사진 {images.length}장</p>
+                <p className="text-sm font-semibold text-gray-700 mb-2">선택된 파일 {images.length}개</p>
                 {images.map((f, i) => (
                   <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={URL.createObjectURL(f)}
-                      alt={f.name}
-                      className="w-12 h-12 object-cover rounded-lg border border-gray-200 flex-shrink-0"
-                    />
+                    {isPdf(f) ? (
+                      /* PDF — 문서 아이콘 */
+                      <div className="w-12 h-12 rounded-lg border border-red-200 bg-red-50 flex items-center justify-center flex-shrink-0">
+                        <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                            d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    ) : (
+                      /* 이미지 — 기존 썸네일 그대로 */
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={URL.createObjectURL(f)}
+                        alt={f.name}
+                        className="w-12 h-12 object-cover rounded-lg border border-gray-200 flex-shrink-0"
+                      />
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-gray-800 truncate">{f.name}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{i + 1}번째 페이지 · {fmtSize(f.size)}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {isPdf(f) ? "PDF 파일" : `${i + 1}번째 페이지`} · {fmtSize(f.size)}
+                      </p>
                     </div>
                     <button
                       onClick={() => setImages(p => p.filter((_, j) => j !== i))}
@@ -136,12 +155,12 @@ export default function PatternRemixPage() {
                   onClick={() => document.getElementById("exam-file-input")?.click()}
                   className="w-full py-2.5 rounded-xl border-2 border-dashed border-gray-200 text-xs text-gray-400 hover:border-green-300 hover:text-green-600 transition-colors"
                 >
-                  + 사진 추가 ({images.length}/30)
+                  + 파일 추가 ({images.length}/30)
                 </button>
               </div>
             )}
 
-            <input id="exam-file-input" type="file" multiple accept="image/*" className="hidden" onChange={handleFileInput} />
+            <input id="exam-file-input" type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={handleFileInput} />
 
             {uploadError && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs">{uploadError}</div>

@@ -365,13 +365,19 @@ function parseRefBox(text: string): ParsedBoxResult | null {
   function isStandalone(idx: number): boolean {
     const before = text.substring(0, idx).trimEnd();
     const ch = before[before.length - 1] ?? '';
-    return !ch || /[.!?:\n]/.test(ch);
+    return !ch || /[.!?:\n)\]]/.test(ch);
+  }
+
+  // 줄 끝 판정: 닫는 ] 직후가 공백만 있고 줄바꿈 또는 텍스트 끝
+  // — [가]/[나] 발문 인라인 사용("([가]와 [나]의 화자는?")과 박스 헤더 구분용
+  function isLineEnd(endIdx: number): boolean {
+    return /^[ \t]*(\n|$)/.test(text.substring(endIdx));
   }
 
   type RawMarker = { idx: number; endIdx: number; label: string; content?: string };
   const markers: RawMarker[] = [];
 
-  // ── 라벨 패턴 목록 ───────────────────────────────────────────────────────
+  // ── 라벨 패턴 목록 (isStandalone 만으로 충분한 명확한 라벨) ─────────────────
   const patterns: { re: RegExp; label: string }[] = [
     { re: /\[보조\s*제시문\]|<보조\s*제시문>/g, label: '<보조 제시문>' },
     { re: /\[보기\]|<보\s*기>/g,               label: '<보기>'         },
@@ -380,10 +386,6 @@ function parseRefBox(text: string): ParsedBoxResult | null {
     { re: /\[자료\]|<자료>/g,                  label: '<자료>'         },
     { re: /\[요약\]/g,                         label: '<요약>'         },
     { re: /\[지문\]/g,                         label: '<지문>'         },
-    { re: /\[가\]/g,                           label: '(가)'           },
-    { re: /\[나\]/g,                           label: '(나)'           },
-    { re: /\[다\]/g,                           label: '(다)'           },
-    { re: /\[라\]/g,                           label: '(라)'           },
   ];
 
   for (const { re, label } of patterns) {
@@ -393,6 +395,41 @@ function parseRefBox(text: string): ParsedBoxResult | null {
       if (isStandalone(m.index)) {
         markers.push({ idx: m.index, endIdx: m.index + m[0].length, label });
       }
+    }
+  }
+
+  // ── [가]/[나]/[다]/[라] — 발문 문장 안 인라인 사용과 구분: 줄 끝에 홀로 있을 때만 박스 ──
+  const gaRe = /\[([가나다라])\]/g;
+  gaRe.lastIndex = 0;
+  let gam: RegExpExecArray | null;
+  while ((gam = gaRe.exec(text)) !== null) {
+    const endIdx = gam.index + gam[0].length;
+    if (isStandalone(gam.index) && isLineEnd(endIdx)) {
+      markers.push({ idx: gam.index, endIdx, label: `(${gam[1]})` });
+    }
+  }
+
+  // ── [자료N] / [자료 N] — 숫자 붙은 자료 라벨, 번호를 헤더에 표시 ──────────────
+  const numberedZaryoRe = /\[자료\s*(\d+)\]/g;
+  numberedZaryoRe.lastIndex = 0;
+  let nzm: RegExpExecArray | null;
+  while ((nzm = numberedZaryoRe.exec(text)) !== null) {
+    const endIdx = nzm.index + nzm[0].length;
+    if (isStandalone(nzm.index) && isLineEnd(endIdx)) {
+      markers.push({ idx: nzm.index, endIdx, label: `<자료${nzm[1]}>` });
+    }
+  }
+
+  // ── [A] / [B] 등 영문 1~2글자 대화 구간 ─────────────────────────────────────
+  // [그림A] 이미지 슬롯은 "[그림A]" 전체이므로 "[A]" 패턴과 충돌 없음
+  // isLineEnd 필수: 발문 안 인라인 "[A]와 [B]를..." 오인 방지
+  const latinLabelRe = /\[([A-Z]{1,2})\]/g;
+  latinLabelRe.lastIndex = 0;
+  let llm: RegExpExecArray | null;
+  while ((llm = latinLabelRe.exec(text)) !== null) {
+    const endIdx = llm.index + llm[0].length;
+    if (isStandalone(llm.index) && isLineEnd(endIdx)) {
+      markers.push({ idx: llm.index, endIdx, label: `[${llm[1]}]` });
     }
   }
 
@@ -469,11 +506,40 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
 
   // ── 문항 1개 HTML ─────────────────────────────────────────────────────────
   function qHtml(q: PatternBasedQuestion): string {
+    // 중복 탐지: q.question_text에 choices 본문이 이미 전부 포함된 경우
+    // (자료/보기 박스 안에 ①~⑤ 항목이 저장됐고 choices에도 동일 텍스트가 중복 저장된 유형)
+    // Q10처럼 기호 1글자뿐인 choices는 length>=10 필터로 제외해 이 분기에 걸리지 않음
+    function normCmp(s: string) { return s.trim().replace(/\s+/g, ' '); }
+    const qtNorm = normCmp(q.question_text);
+    const choicesAreDuplicated =
+      q.choices.length >= 2 &&
+      q.choices.every(c => { const t = normCmp(c.text); return t.length >= 10 && qtNorm.includes(t); });
+
     const choices = q.choices.length > 0
       ? `<div style="margin-top:6px;">` +
         q.choices.map((c, ci) => {
-          const hl     = showAnswerInfo && c.is_correct;
-          const circle = CIRCLE[ci] ?? `${c.number}.`;
+          const hl           = showAnswerInfo && c.is_correct;
+          const circlePrefix = CIRCLE[ci] ?? `${c.number}.`;
+
+          if (choicesAreDuplicated) {
+            // 기호만 렌더링 — 발문/자료 박스에 이미 본문이 나왔으므로 텍스트 중복 방지
+            // 교사용: ★ 하이라이트 유지
+            const reason = showAnswerInfo && c.reason
+              ? `<p style="font-size:8pt;color:#555;padding-left:1.3em;line-height:1.35;margin-top:1px;">${escapeHtml(c.reason)}</p>`
+              : "";
+            return `<p style="font-size:9.5pt;line-height:1.72;margin:2px 0;">` +
+              `<span style="font-weight:700;color:${hl ? "#0a5c0a" : "#000"};">${circlePrefix}</span>` +
+              `${hl ? `<span style="color:#0a5c0a;font-weight:700;"> ★</span>` : ""}` +
+              `</p>${reason}`;
+          }
+
+          // 일반 문항 — 기존 렌더링 그대로
+          // c.text가 동그라미 기호로 시작하면 접두사 기호를 제거해 이중 출력 방지
+          // 예: c.text="①" or "① 발표 중간에…" → circle="" + text 그대로
+          const CIRC_RE = /^[①②③④⑤⑥⑦⑧⑨⑩]/;
+          const textStartsWithCircle = CIRC_RE.test(c.text.trimStart());
+          const circle   = textStartsWithCircle ? "" : circlePrefix;
+          const bodyText = textStartsWithCircle ? c.text.trimStart() : c.text;
           // 선택지 두 번째 줄이 텍스트 시작 위치에 맞게 들여쓰기 (hanging indent)
           const reason = showAnswerInfo && c.reason
             ? `<p style="font-size:8pt;color:#555;padding-left:1.3em;line-height:1.35;margin-top:1px;">${escapeHtml(c.reason)}</p>`
@@ -481,7 +547,7 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
           return `<p style="font-size:9.5pt;line-height:1.72;margin:2px 0;word-break:keep-all;` +
             `padding-left:1.25em;text-indent:-1.25em;${hl ? "font-weight:700;" : ""}">` +
             `<span style="font-weight:700;color:${hl ? "#0a5c0a" : "#000"};">${circle}</span>` +
-            `<span style="${hl ? "color:#0a5c0a;" : ""}"> ${escapeHtml(normalizeRefs(c.text))}${hl ? " ★" : ""}</span>` +
+            `<span style="${hl ? "color:#0a5c0a;" : ""}"> ${escapeHtml(normalizeRefs(bodyText))}${hl ? " ★" : ""}</span>` +
             `</p>${reason}`;
         }).join("") +
         `</div>`
@@ -503,7 +569,7 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
     ].join("") : "";
 
     // 학생용: 고난도 [3점] 표시 / 교사용: 유형·난이도 태그
-    const pointTag = !showAnswerInfo && q.difficulty === '고난도'
+    const pointTag = !showAnswerInfo && q.difficulty === '고난도' && !q.question_text.includes('[3점]')
       ? `&thinsp;<span style="font-size:8pt;font-weight:400;">[3점]</span>` : "";
     const infoTag = showAnswerInfo
       ? `&nbsp;<span style="font-size:8.5pt;color:#777;font-weight:400;">[${q.question_type}·${q.difficulty}${q.answer === 0 ? "·서술형" : ""}]</span>`
@@ -628,7 +694,7 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
           .join("")
       : "";
     const passBox = hasPass
-      ? `<div style="border:1px solid #555;margin-bottom:10px;padding:9px 13px 11px;">
+      ? `<div style="border:1px solid #555;margin-bottom:10px;padding:9px 13px 11px;break-inside:avoid;">
            ${imgs}
            ${passParasHtml}
            ${kp}

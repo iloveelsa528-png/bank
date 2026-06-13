@@ -10,7 +10,7 @@ import PdfDownloadButtons from "@/components/PdfDownloadButtons";
 import type { PdfData, PassagePdfInfo } from "@/lib/pdf/generate";
 import type { Job } from "@/types/jobs";
 
-type WizardStep = 1 | 2 | 3;
+type WizardStep = 1 | 2 | 3 | 4;
 
 const DIFF_OPTIONS = ["기본", "응용", "고난도"];
 const TYPE_OPTIONS = ["내용이해", "추론", "표현분석", "어휘문법", "비판적사고", "적용", "서술형"];
@@ -30,6 +30,11 @@ const TYPE_COLOR: Record<string, string> = {
   서술형: "bg-gray-100 text-gray-700",
 };
 
+function computeArea(passages: Pick<SourcePassage, 'area'>[]): string {
+  const areas = [...new Set(passages.map(p => p.area).filter(Boolean))];
+  return areas.length === 1 ? areas[0] : '국어';
+}
+
 interface EditableQuestion {
   draft: PatternBasedQuestion;
   excluded: boolean;
@@ -43,11 +48,13 @@ function StepBar({
   current,
   patterns,
   passages,
+  showPairing,
   onStep,
 }: {
   current: WizardStep;
   patterns: ExamPatternSet[];
   passages: SourcePassage[];
+  showPairing: boolean;
   onStep: (s: WizardStep) => void;
 }) {
   const patternLabel = patterns.length === 0
@@ -62,11 +69,18 @@ function StepBar({
       ? passages[0].title
       : `지문 ${passages.length}개 선택`;
 
-  const steps: { n: WizardStep; label: string; done: boolean }[] = [
-    { n: 1, label: patternLabel, done: patterns.length > 0 },
-    { n: 2, label: passageLabel, done: passages.length > 0 },
-    { n: 3, label: "문제 생성", done: false },
-  ];
+  const steps: { n: WizardStep; label: string; done: boolean }[] = showPairing
+    ? [
+        { n: 1, label: patternLabel, done: patterns.length > 0 },
+        { n: 2, label: passageLabel, done: passages.length > 0 },
+        { n: 3, label: "짝 지정", done: current === 4 },
+        { n: 4, label: "문제 생성", done: false },
+      ]
+    : [
+        { n: 1, label: patternLabel, done: patterns.length > 0 },
+        { n: 2, label: passageLabel, done: passages.length > 0 },
+        { n: 4, label: "문제 생성", done: false },
+      ];
   return (
     <div className="bg-white border-b sticky top-0 z-10">
       <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-2 overflow-x-auto">
@@ -392,6 +406,104 @@ function PassageStep({
   );
 }
 
+// ── 짝 지정 단계 (3단계) ──────────────────────────────────────────────────────
+function PairingStep({
+  selectedPassages,
+  selectedPatterns,
+  pairingMap,
+  onPairingChange,
+  onConfirm,
+  onBack,
+}: {
+  selectedPassages: SourcePassage[];
+  selectedPatterns: ExamPatternSet[];
+  pairingMap: Record<string, string | null>;
+  onPairingChange: (passageId: string, patternSetId: string | null) => void;
+  onConfirm: () => void;
+  onBack: () => void;
+}) {
+  const pairingCount = Object.values(pairingMap).filter(v => v !== null && v !== undefined).length;
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-6 pb-32">
+      {/* 선택된 패턴 요약 */}
+      <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 mb-5">
+        <span className="text-green-700 text-sm">✓ 패턴:</span>
+        <span className="text-sm font-semibold text-green-800 truncate">
+          {selectedPatterns.length === 1
+            ? selectedPatterns[0].title
+            : `패턴 ${selectedPatterns.length}개`}
+        </span>
+        <button onClick={onBack} className="ml-auto text-xs text-green-600 hover:underline flex-shrink-0">변경</button>
+      </div>
+
+      <div className="mb-5">
+        <h2 className="text-lg font-bold text-gray-900">지문마다 패턴을 지정하세요</h2>
+        <p className="text-sm text-gray-500 mt-1">선택 사항 — 지정하지 않으면 선택한 모든 패턴이 적용됩니다.</p>
+      </div>
+
+      <div className="space-y-3">
+        {selectedPassages.map((passage) => {
+          const selectedPatternId = pairingMap[passage.id] ?? null;
+          return (
+            <div
+              key={passage.id}
+              className={`bg-white rounded-2xl border-2 p-4 transition-all ${
+                selectedPatternId ? "border-green-300 bg-green-50/30" : "border-gray-200"
+              }`}
+            >
+              <div className="mb-3">
+                <p className="font-semibold text-gray-900">{passage.title}</p>
+                {passage.analysis_summary && (
+                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{passage.analysis_summary}</p>
+                )}
+                {passage.passage_text && (
+                  <p className="text-xs text-gray-400 mt-0.5">{passage.passage_text.length.toLocaleString()}자</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">적용할 패턴</label>
+                <select
+                  value={selectedPatternId ?? ""}
+                  onChange={(e) => onPairingChange(passage.id, e.target.value || null)}
+                  className="w-full text-sm border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
+                >
+                  <option value="">전체 패턴 적용 (기본)</option>
+                  {selectedPatterns.map((ps) => (
+                    <option key={ps.id} value={ps.id}>
+                      {ps.area ? `[${ps.area}] ` : ""}{ps.title}{ps.exam_patterns && ps.exam_patterns.length > 0 ? ` — 패턴 ${ps.exam_patterns.length}개` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 다음 단계 버튼 */}
+      <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-[60]">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <p className="text-sm text-gray-500">
+            {pairingCount > 0
+              ? <><span className="font-bold text-green-700">{pairingCount}개</span> 지문에 패턴 지정됨</>
+              : "짝 지정 안 함 — 전체 패턴 적용"}
+          </p>
+          <button
+            onClick={onConfirm}
+            className="flex items-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors shadow-md flex-shrink-0"
+          >
+            다음 단계
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── 지문 미리보기 카드 ────────────────────────────────────────────────────────
 function PassagePreviewCard({ title, text }: { title?: string; text: string }) {
   const [open, setOpen] = useState(false);
@@ -620,7 +732,7 @@ function QuestionCard({
   );
 }
 
-// ── 문제 생성 (3단계) ────────────────────────────────────────────────────────
+// ── 문제 생성 (4단계) ────────────────────────────────────────────────────────
 interface PassageJobState {
   passage: SourcePassage;
   jobId: string | null;
@@ -631,10 +743,12 @@ interface PassageJobState {
 function GenerateStep({
   selectedPatterns,
   selectedPassages,
+  pairingMap,
   onBack,
 }: {
   selectedPatterns: ExamPatternSet[];
   selectedPassages: SourcePassage[];
+  pairingMap: Record<string, string | null>;
   onBack: () => void;
 }) {
   const isMultiPassage = selectedPassages.length > 1;
@@ -705,11 +819,17 @@ function GenerateStep({
     try {
       const jobResults = await Promise.all(
         selectedPassages.map(async (passage) => {
+          // 짝 지정: 이 지문에 특정 패턴이 지정됐으면 그것만, 없으면 전체 패턴 적용
+          const assignedId = pairingMap[passage.id] ?? null;
+          const patternSetIds = assignedId
+            ? [assignedId]
+            : selectedPatterns.map(p => p.id);
+
           const res = await fetch("/api/pattern-remix/generate-job", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              pattern_set_ids: selectedPatterns.map(p => p.id),
+              pattern_set_ids: patternSetIds,
               source_passage_id: passage.id,
               question_count: perPassageCount,
               genre_adaptation: genreAdaptation,
@@ -767,7 +887,7 @@ function GenerateStep({
           source_passage_id: selectedPassages[0].id,
           generated_questions: finalQuestions,
           difficulty: "",
-          area: selectedPassages[0].area ?? "",
+          area: computeArea(selectedPassages),
           source_job_id: passageJobs[0]?.jobId ?? null,
           passages_json: finalPassageInfos,
         }),
@@ -789,7 +909,7 @@ function GenerateStep({
       title: saveTitle,
       school: selectedPatterns[0].school_name,
       grade: selectedPatterns[0].grade,
-      area: selectedPassages[0].area,
+      area: computeArea(selectedPassages),
       patternSetTitle: selectedPatterns.map(p => p.title).join(', '),
       questions: filteredQs,
     };
@@ -1142,6 +1262,7 @@ function GeneratePageInner() {
   const [loadError, setLoadError] = useState("");
   const [selectedPatterns, setSelectedPatterns] = useState<ExamPatternSet[]>([]);
   const [selectedPassages, setSelectedPassages] = useState<SourcePassage[]>([]);
+  const [pairingMap, setPairingMap] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     const prePattern = searchParams.get("pattern");
@@ -1170,10 +1291,10 @@ function GeneratePageInner() {
 
       if (prePassage) {
         const found = loadedPassages.find(p => p.id === prePassage);
-        if (found) { autoPassages = [found]; if (step === 2) step = 3; }
+        if (found) { autoPassages = [found]; if (step === 2) step = 4; }
       } else if (loadedPassages.length === 1 && step === 2) {
         autoPassages = [loadedPassages[0]];
-        step = 3;
+        step = 4;
       }
 
       if (autoPatterns.length > 0) setSelectedPatterns(autoPatterns);
@@ -1214,7 +1335,14 @@ function GeneratePageInner() {
   }
 
   function handleConfirmPassages() {
-    if (selectedPassages.length > 0) setWizardStep(3);
+    if (selectedPassages.length > 0) {
+      const needsPairing = selectedPassages.length > 1 && selectedPatterns.length > 1;
+      setWizardStep(needsPairing ? 3 : 4);
+    }
+  }
+
+  function handlePairingChange(passageId: string, patternSetId: string | null) {
+    setPairingMap(prev => ({ ...prev, [passageId]: patternSetId }));
   }
 
   return (
@@ -1248,10 +1376,12 @@ function GeneratePageInner() {
         current={wizardStep}
         patterns={selectedPatterns}
         passages={selectedPassages}
+        showPairing={selectedPassages.length > 1 && selectedPatterns.length > 1}
         onStep={(s) => {
           if (s === 1) setWizardStep(1);
           else if (s === 2 && selectedPatterns.length > 0) setWizardStep(2);
           else if (s === 3 && selectedPatterns.length > 0 && selectedPassages.length > 0) setWizardStep(3);
+          else if (s === 4 && selectedPatterns.length > 0 && selectedPassages.length > 0) setWizardStep(4);
         }}
       />
 
@@ -1286,10 +1416,22 @@ function GeneratePageInner() {
       )}
 
       {wizardStep === 3 && selectedPatterns.length > 0 && selectedPassages.length > 0 && (
+        <PairingStep
+          selectedPassages={selectedPassages}
+          selectedPatterns={selectedPatterns}
+          pairingMap={pairingMap}
+          onPairingChange={handlePairingChange}
+          onConfirm={() => setWizardStep(4)}
+          onBack={() => setWizardStep(2)}
+        />
+      )}
+
+      {wizardStep === 4 && selectedPatterns.length > 0 && selectedPassages.length > 0 && (
         <GenerateStep
           selectedPatterns={selectedPatterns}
           selectedPassages={selectedPassages}
-          onBack={() => setWizardStep(2)}
+          pairingMap={pairingMap}
+          onBack={() => setWizardStep(selectedPassages.length > 1 && selectedPatterns.length > 1 ? 3 : 2)}
         />
       )}
     </div>
