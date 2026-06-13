@@ -3,6 +3,10 @@
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { SourcePassage } from "@/types/passages";
+import type { ImageSlot } from "@/types/passages";
+
+const toImageUrl = (item: string | ImageSlot): string =>
+  typeof item === "string" ? item : item.url;
 
 const AREA_BADGE: Record<string, string> = {
   문학: "bg-purple-100 text-purple-700",
@@ -272,6 +276,11 @@ export default function PassageLibraryPage() {
                         className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-green-600 hover:bg-green-700 transition-colors">
                         문제 생성 →
                       </Link>
+                      <Link
+                        href={`/source-passages/${p.id}/edit`}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 transition-colors">
+                        편집
+                      </Link>
                       <button
                         onClick={() => setExpanded((v) => v === p.id ? null : p.id)}
                         className="px-3 py-1.5 rounded-lg text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 transition-colors">
@@ -292,10 +301,10 @@ export default function PassageLibraryPage() {
                         <div>
                           <p className="text-xs font-semibold text-gray-500 mb-2">원본 이미지 ({p.image_urls.length}장)</p>
                           <div className="flex flex-wrap gap-3">
-                            {p.image_urls.map((url, i) => (
-                              <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                            {p.image_urls.map((item, i) => (
+                              <a key={i} href={toImageUrl(item)} target="_blank" rel="noopener noreferrer">
                                 <img
-                                  src={url}
+                                  src={toImageUrl(item)}
                                   alt={`지문 이미지 ${i + 1}`}
                                   className="max-h-64 rounded-lg border border-gray-200 object-contain hover:shadow-md transition-shadow cursor-zoom-in"
                                 />

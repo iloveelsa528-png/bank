@@ -4,8 +4,10 @@ import React, { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CandidateQuestionPoint } from "@/types/passages";
+import type { ImageSlot } from "@/types/passages";
 import JobRunner from "@/components/JobRunner";
 import type { Job } from "@/types/jobs";
+import EditorPanel from "@/components/editor/EditorPanel";
 
 const PASSAGE_SYNC_LIMIT = 3000;
 const AREAS = ["문학", "독서", "문법", "화작"];
@@ -78,6 +80,9 @@ export default function SourcePassagesPage() {
   const [passageJobId, setPassageJobId]     = useState<string | null>(null);
   const [passageJobDone, setPassageJobDone] = useState(false);
   const [sourceJobId, setSourceJobId]       = useState<string | null>(null);
+
+  type Phase = "input" | "analyzing" | "editing" | "saving" | "done";
+  const [phase, setPhase] = useState<Phase>("input");
 
   const [saving, setSaving]   = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -206,6 +211,7 @@ export default function SourcePassagesPage() {
       });
       if (!res.ok) throw new Error((await res.json()).error || "분석 오류");
       applyAnalysisResult(await res.json());
+      setPhase("editing");
     } catch (e) {
       alert(e instanceof Error ? e.message : "지문 분석 실패");
     } finally {
@@ -228,25 +234,34 @@ export default function SourcePassagesPage() {
     applyAnalysisResult(result);
     setPassageJobDone(true);
     setSourceJobId(job.id);
+    setPhase("editing");
   };
 
-  const handleSave = async () => {
-    if (!passageText.trim()) { setError("지문 내용을 입력하세요."); return; }
+  const handleSave = async (overrides?: { passageText?: string; title?: string; imageSlots?: ImageSlot[] }) => {
+    const textToSave  = overrides?.passageText ?? passageText;
+    const autoTitleOf = textToSave.trim().split("\n").find(l => l.trim())?.slice(0, 30) ?? "지문";
+    const titleToSave = overrides?.title?.trim() || title.trim() || autoTitleOf;
+
+    if (!textToSave.trim()) { setError("지문 내용을 입력하세요."); return; }
     setSaving(true); setError("");
     try {
       const res = await fetch("/api/source-passages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: effectiveTitle, area, source_type: sourceType,
-          passage_text: passageText, ocr_raw_text: ocrRaw,
+          title: titleToSave, area, source_type: sourceType,
+          passage_text: textToSave, ocr_raw_text: ocrRaw,
           analysis_summary: analysisSummary, key_points: keyPoints,
-          candidate_question_points: candidatePoints, image_urls: [],
+          candidate_question_points: candidatePoints,
+          image_urls: overrides?.imageSlots ?? [],
           ...(sourceJobId ? { source_job_id: sourceJobId } : {}),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "저장 실패");
+      // 편집된 값을 부모 state에도 반영
+      if (overrides?.passageText !== undefined) setPassageText(overrides.passageText);
+      if (overrides?.title !== undefined) setTitle(overrides.title);
       setSavedId(data.id);
       setTimeout(() => router.push("/pattern-remix/generate"), 1500);
     } catch (e) {
@@ -264,6 +279,7 @@ export default function SourcePassagesPage() {
     setAnalysisSummary(""); setKeyPoints(""); setCandidatePoints([]);
     setPassageJobId(null); setPassageJobDone(false); setSourceJobId(null);
     setSavedId(null); setError("");
+    setPhase("input");
   };
 
   const canSave = !!passageText.trim() && !savedId;
@@ -590,6 +606,22 @@ export default function SourcePassagesPage() {
           </>
         )}
 
+        {/* 편집 패널 — 분석 완료 후 자동 노출 */}
+        {phase === "editing" && !savedId && (
+          <EditorPanel
+            passageText={passageText}
+            analysisSummary={analysisSummary}
+            keyPoints={keyPoints}
+            candidatePoints={candidatePoints}
+            title={effectiveTitle}
+            saving={saving}
+            onSave={(editedText, editedTitle, imageSlots) =>
+              handleSave({ passageText: editedText, title: editedTitle, imageSlots })
+            }
+            onBack={() => setPhase("input")}
+          />
+        )}
+
         {/* 지문 정보 (선택 사항) */}
         {passageText.trim() && (
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col gap-3">
@@ -632,8 +664,8 @@ export default function SourcePassagesPage() {
 
       </main>
 
-      {/* Sticky 저장 바 */}
-      {canSave && (
+      {/* Sticky 저장 바 — 편집 모드에서는 EditorPanel 버튼 사용 */}
+      {canSave && phase !== "editing" && (
         <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-[60]">
           <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
             <div className="flex-1 min-w-0">
@@ -643,7 +675,7 @@ export default function SourcePassagesPage() {
                 : <p className="text-xs text-gray-400 mt-0.5">분석 없이도 저장 가능합니다</p>
               }
             </div>
-            <button onClick={handleSave} disabled={saving}
+            <button onClick={() => handleSave()} disabled={saving}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold flex-shrink-0 transition-all ${
                 !saving ? "bg-green-600 text-white hover:bg-green-700 shadow-md" : "bg-gray-100 text-gray-400 cursor-not-allowed"
               }`}>

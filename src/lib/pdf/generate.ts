@@ -1,11 +1,12 @@
 import type { PatternBasedQuestion } from "@/types/pattern-remix";
+import type { ImageSlot } from "@/types/passages";
 
 export type PdfMode = "student" | "teacher" | "full";
 
 export interface PassagePdfInfo {
   title?: string;
   text?: string;
-  imageUrls?: string[];
+  imageUrls?: (string | ImageSlot)[];
   keyPoints?: string;
   startQuestionIdx: number;
   questionCount: number;
@@ -22,7 +23,7 @@ export interface PdfData {
   // 단일 지문 (레거시)
   passageTitle?: string;
   passageText?: string;
-  passageImageUrls?: string[];
+  passageImageUrls?: (string | ImageSlot)[];
   keyPoints?: string;
   // 다중 지문 (신규)
   passages?: PassagePdfInfo[];
@@ -43,6 +44,49 @@ function escapeHtml(s: string | undefined | null): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+// string(구 형식) 또는 ImageSlot(신 형식) 모두 URL 문자열로 정규화
+function toImageUrl(item: string | ImageSlot): string {
+  return typeof item === "string" ? item : item.url;
+}
+
+// ─── Image slot helpers ───────────────────────────────────────────────────
+
+// ImageSlot 배열 → id(대문자) → url 맵
+function buildSlotMap(slots: (string | ImageSlot)[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const item of slots) {
+    if (typeof item !== "string") map.set(item.id.toUpperCase(), item.url);
+  }
+  return map;
+}
+
+// 이미 escapeHtml을 거친 HTML 문자열 안의 [그림A] 토큰을 img 또는 placeholder로 교체.
+// [ ] 는 HTML 특수문자가 아니므로 escapeHtml 후에도 토큰이 원형 그대로 남아있음.
+function applyImageSlotsToHtml(html: string, slotMap: Map<string, string>): string {
+  if (slotMap.size === 0 && !/\[그림[A-Za-z]\]/.test(html)) return html;
+  return html.replace(/\[그림([A-Za-z])\]/g, (_, letter) => {
+    const url = slotMap.get(letter.toUpperCase());
+    if (url) {
+      return `<img src="${url}" crossorigin="anonymous"
+        style="display:block;max-width:100%;max-height:240px;margin:6px auto;object-fit:contain;"/>`;
+    }
+    // 이미지 미연결 — 회색 placeholder 박스
+    return `<span style="display:inline-block;min-width:100px;padding:10px 16px;
+      background:#f3f4f6;border:1.5px dashed #9ca3af;border-radius:2px;
+      font-size:9pt;color:#6b7280;vertical-align:middle;">[그림${letter}]</span>`;
+  });
+}
+
+// 외부에서 호출 가능한 공개 API (테스트·향후 EditorPanel 미리보기 등에 사용)
+// raw 텍스트를 받아 슬롯을 HTML로 치환한 결과를 반환 (escapeHtml은 내부에서 처리하지 않음)
+export function replaceImageSlots(
+  rawText: string,
+  slots: (string | ImageSlot)[],
+): string {
+  const slotMap = buildSlotMap(slots);
+  return applyImageSlotsToHtml(rawText, slotMap);
 }
 
 function today() {
@@ -133,8 +177,8 @@ export function buildPassageSection(data: PdfData, mode: PdfMode): string {
       ? `<div style="margin-bottom:12px;">
           ${(data.passageImageUrls ?? [])
             .map(
-              (url) =>
-                `<img src="${url}" crossorigin="anonymous"
+              (item) =>
+                `<img src="${toImageUrl(item)}" crossorigin="anonymous"
                   style="max-width:100%;max-height:360px;display:block;margin-bottom:6px;
                          border:1px solid #d1d5db;object-fit:contain;"/>`
             )
@@ -490,7 +534,7 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
 
   // ── 지문 그룹 ─────────────────────────────────────────────────────────────
   type G = {
-    title?: string; text?: string; imageUrls?: string[];
+    title?: string; text?: string; imageUrls?: (string | ImageSlot)[];
     keyPoints?: string; questions: PatternBasedQuestion[];
   };
   const groups: G[] = data.passages && data.passages.length > 0
@@ -520,12 +564,18 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
       ? `<p style="font-size:10pt;font-weight:700;line-height:1.7;margin-bottom:6px;break-after:avoid;">${range}&nbsp;다음 글을 읽고 물음에 답하시오.</p>`
       : "";
 
-    // 지문 이미지
-    const imgs = (g.imageUrls ?? []).length > 0
-      ? `<div style="margin-bottom:6px;">${(g.imageUrls ?? []).map(url =>
+    // 지문 이미지 (string 형식 레거시만 — ImageSlot은 [그림A] 토큰으로 인라인 처리)
+    const legacyImgs = (g.imageUrls ?? []).filter(
+      (item): item is string => typeof item === "string",
+    );
+    const imgs = legacyImgs.length > 0
+      ? `<div style="margin-bottom:6px;">${legacyImgs.map(url =>
           `<img src="${url}" crossorigin="anonymous" style="max-width:100%;max-height:260px;display:block;margin-bottom:4px;object-fit:contain;"/>`
         ).join("")}</div>`
       : "";
+
+    // 이미지 슬롯 맵 — 문단 렌더링에서 [그림A] 토큰 교체에 사용
+    const slotMap = buildSlotMap(g.imageUrls ?? []);
 
     // 핵심 포인트 (전체본)
     const kp = mode === "full" && g.keyPoints
@@ -541,7 +591,26 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
           .filter(p => p.trim().length > 0)
           .map(p => {
             const trimmed = p.trim();
-            const styled = escapeHtml(trimmed)
+
+            // 단독 [그림A] 문단 → 이미지 블록 (pre-wrap 없이, 중앙 정렬)
+            const imageOnlyMatch = trimmed.match(/^\[그림([A-Za-z])\]$/);
+            if (imageOnlyMatch) {
+              const letter = imageOnlyMatch[1];
+              const url = slotMap.get(letter.toUpperCase());
+              return url
+                ? `<div style="text-align:center;margin:8px 0 10px;">
+                     <img src="${url}" crossorigin="anonymous"
+                       style="max-width:100%;max-height:240px;object-fit:contain;"/>
+                   </div>`
+                : `<div style="text-align:center;margin:8px 0 10px;">
+                     <span style="display:inline-block;min-width:120px;padding:12px 20px;
+                       background:#f3f4f6;border:1.5px dashed #9ca3af;border-radius:2px;
+                       font-size:9pt;color:#6b7280;">[그림${letter}]</span>
+                   </div>`;
+            }
+
+            // 일반 문단 — escapeHtml 후 [그림A] 인라인 토큰 교체, 그 뒤 (가)(나) 볼드
+            const styled = applyImageSlotsToHtml(escapeHtml(trimmed), slotMap)
               .replace(/\(([가나다라마바사아자차카타파하])\)/g,
                 '<b style="font-size:10.5pt;letter-spacing:0.5px;">($1)</b>');
             const isSectionMarker = /^\(?[가나다라마바사아자차카타파하]\)?$/.test(trimmed);

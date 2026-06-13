@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, parseJSON, stringifyJSON } from '@/lib/db';
 import { randomUUID } from 'crypto';
-import type { CandidateQuestionPoint } from '@/types/passages';
+import type { CandidateQuestionPoint, ImageSlot } from '@/types/passages';
 
 function parsePassageRow(row: Record<string, unknown>) {
   return {
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       passage_text: string; ocr_raw_text: string;
       analysis_summary: string; key_points: string;
       candidate_question_points: CandidateQuestionPoint[];
-      image_urls: string[];
+      image_urls: (string | ImageSlot)[];
     } = body;
 
     if (!title?.trim()) {
