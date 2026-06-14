@@ -85,6 +85,14 @@ function initSchema(db: Database.Database) {
       created_at    TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS sessions (
+      id         TEXT PRIMARY KEY,
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
     CREATE INDEX IF NOT EXISTS idx_exam_patterns_set ON exam_patterns(pattern_set_id);
     CREATE INDEX IF NOT EXISTS idx_question_sets_pattern ON question_sets(pattern_set_id);
     CREATE INDEX IF NOT EXISTS idx_question_sets_passage ON question_sets(source_passage_id);
