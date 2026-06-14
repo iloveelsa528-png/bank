@@ -76,6 +76,15 @@ function initSchema(db: Database.Database) {
       updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS users (
+      id            TEXT PRIMARY KEY,
+      username      TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      role          TEXT NOT NULL DEFAULT 'teacher',
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_exam_patterns_set ON exam_patterns(pattern_set_id);
     CREATE INDEX IF NOT EXISTS idx_question_sets_pattern ON question_sets(pattern_set_id);
     CREATE INDEX IF NOT EXISTS idx_question_sets_passage ON question_sets(source_passage_id);
