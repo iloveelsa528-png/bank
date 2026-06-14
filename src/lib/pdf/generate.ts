@@ -617,9 +617,6 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
 
   // ── 그룹별 HTML ───────────────────────────────────────────────────────────
   const contentHtml = groups.map((g, gi) => {
-    const sepHtml = gi > 0
-      ? `<div style="column-span:all;border-top:2px solid #555;margin:16px 0 10px;"></div>`
-      : "";
     const hasPass = !!(g.text || (g.imageUrls ?? []).length > 0);
     const qNums  = g.questions.map(q => q.question_number).sort((a, b) => a - b);
     const range  = qNums.length > 1
@@ -701,7 +698,21 @@ export function buildUnifiedHtml(data: PdfData, mode: PdfMode): string {
       .map(q => `<div style="break-inside:avoid;">${qHtml(q)}</div>`)
       .join("");
 
-    return `${sepHtml}${directive}${passBox}${questionsHtml}<div style="height:8px;"></div>`;
+    // 교사용: 현행 로직 유지 (column-span:all 구분선, 자유 흐름)
+    if (showAnswerInfo) {
+      const sepHtml = gi > 0
+        ? `<div style="column-span:all;border-top:2px solid #555;margin:16px 0 10px;"></div>`
+        : "";
+      return `${sepHtml}${directive}${passBox}${questionsHtml}<div style="height:8px;"></div>`;
+    }
+
+    // 학생용: 그룹 래퍼로 감싸 단 상단 시작(a) + 덩어리 묶음(c) 적용
+    // gi=0은 break-before:column 제외 (맨 앞 빈 단 방지)
+    const groupBorderHtml = gi > 0
+      ? `<div style="border-top:2px solid #555;margin-bottom:10px;"></div>`
+      : "";
+    const breakBeforeStyle = gi > 0 ? "break-before:column;" : "";
+    return `<div style="${breakBeforeStyle}break-inside:avoid;">${groupBorderHtml}${directive}${passBox}${questionsHtml}<div style="height:8px;"></div></div>`;
   }).join("");
 
   // body 자체가 2단 컨테이너 — contentHtml을 직접 삽입
