@@ -29,6 +29,7 @@ export interface Job {
   completed_chunks: number;
   failed_chunks: number;
   token_usage: number;
+  usage_by_model: Record<string, { input: number; output: number }> | null;
   error_message: string | null;
   payload: Record<string, unknown>;
   result: Record<string, unknown> | null;

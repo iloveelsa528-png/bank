@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createExamOcrJob, createExamTextJob } from '@/lib/jobs/driver';
 import { extractTextFromPdf } from '@/lib/pdf/extract-text';
 import { pdfToImages } from '@/lib/pdf/pdf-to-images';
+import { getSessionUser } from '@/lib/session';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -18,6 +19,7 @@ async function handlePdfUpload(
   file: File,
   folderPath: string,
   uploadFolderId: string,
+  userId: string,
 ): Promise<NextResponse> {
   // PDF를 디스크에 저장
   const pdfPath = path.join(folderPath, 'upload.pdf');
@@ -30,7 +32,7 @@ async function handlePdfUpload(
   if (extracted.isTextPdf) {
     // ── 텍스트 PDF: OCR 없이 바로 segment → analyze ──────────────
     console.log('[POST /api/uploads/exam] 텍스트 PDF 감지, 텍스트 파이프라인 실행. chars:', extracted.text.length);
-    const job = createExamTextJob(extracted.text, uploadFolderId);
+    const job = createExamTextJob(extracted.text, uploadFolderId, userId);
     return NextResponse.json({ jobId: job.id, mode: 'text_pdf' });
   }
 
@@ -55,7 +57,7 @@ async function handlePdfUpload(
   }
 
   console.log('[POST /api/uploads/exam] 이미지 PDF → PNG 변환 완료:', localPaths.length, '장');
-  const job = createExamOcrJob(localPaths, uploadFolderId);
+  const job = createExamOcrJob(localPaths, uploadFolderId, userId);
   return NextResponse.json({ jobId: job.id, mode: 'image_pdf', paths: localPaths });
 }
 
@@ -66,6 +68,7 @@ async function handleImageUpload(
   files: File[],
   folderPath: string,
   uploadFolderId: string,
+  userId: string,
 ): Promise<NextResponse> {
   const localPaths: string[] = [];
   for (let i = 0; i < files.length; i++) {
@@ -78,7 +81,7 @@ async function handleImageUpload(
     localPaths.push(path.join('public', 'uploads', 'exam', uploadFolderId, filename));
   }
 
-  const job = createExamOcrJob(localPaths, uploadFolderId);
+  const job = createExamOcrJob(localPaths, uploadFolderId, userId);
   console.log('[POST /api/uploads/exam] job created:', job.id, 'files:', localPaths.length);
   return NextResponse.json({ jobId: job.id, paths: localPaths });
 }
@@ -87,6 +90,12 @@ async function handleImageUpload(
 // POST handler
 // ────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) {
+    return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
+  }
+  const userId = sessionUser.id;
+
   try {
     const formData = await request.formData();
     const imageCount = Number(formData.get('imageCount') ?? '0');
@@ -111,14 +120,14 @@ export async function POST(request: NextRequest) {
       (files[0].name.toLowerCase().endsWith('.pdf') ||
         files[0].type === 'application/pdf')
     ) {
-      return await handlePdfUpload(files[0], folderPath, uploadFolderId);
+      return await handlePdfUpload(files[0], folderPath, uploadFolderId, userId);
     }
 
     // 이미지 파일 (기존 경로 — 변경 없음)
     if (files.length > 10) {
       return NextResponse.json({ error: '최대 10장까지 업로드 가능합니다.' }, { status: 400 });
     }
-    return await handleImageUpload(files, folderPath, uploadFolderId);
+    return await handleImageUpload(files, folderPath, uploadFolderId, userId);
   } catch (err) {
     console.error('[POST /api/uploads/exam] error:', err);
     return NextResponse.json({ error: extractMsg(err) }, { status: 500 });

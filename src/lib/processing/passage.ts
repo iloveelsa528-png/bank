@@ -1,5 +1,6 @@
 import { runPassageAnalyzeChunk, splitPassageIntoWindows, mergePassageAnalyses } from '@/lib/ai/passage';
 import { updateJob, getJob, getAbortSignal } from '@/lib/jobs/store';
+import { mergeModel } from '@/lib/jobs/usage';
 
 function checkAbort(jobId: string) {
   const signal = getAbortSignal(jobId);
@@ -26,6 +27,7 @@ export async function runPassagePipeline(
       updateJob(jobId, {
         completed_chunks: (cur?.completed_chunks ?? 0) + 1,
         token_usage: (cur?.token_usage ?? 0) + result.usage.input_tokens + result.usage.output_tokens,
+        usage_by_model: mergeModel(cur?.usage_by_model, result.usage.model, result.usage.input_tokens, result.usage.output_tokens),
       });
     }
 

@@ -9,12 +9,13 @@ import type { Job } from '@/types/jobs';
 
 const GENERATE_BATCH = 3;
 
-export function createExamOcrJob(localImagePaths: string[], uploadFolderId: string): Job {
+export function createExamOcrJob(localImagePaths: string[], uploadFolderId: string, userId: string = ''): Job {
   const total = localImagePaths.length + 2;
   const job = createJob(
     'exam_ocr_analyze',
     { imagePaths: localImagePaths, uploadFolderId },
     total,
+    userId,
   );
   runExamPipeline(job.id, localImagePaths).catch(err =>
     console.error('[exam pipeline error]', err),
@@ -23,12 +24,13 @@ export function createExamOcrJob(localImagePaths: string[], uploadFolderId: stri
 }
 
 // 텍스트 레이어가 있는 PDF용 — OCR 없이 바로 segment → analyze
-export function createExamTextJob(extractedText: string, uploadFolderId: string): Job {
+export function createExamTextJob(extractedText: string, uploadFolderId: string, userId: string = ''): Job {
   // total_chunks = OCR 대체(1) + segment(1) + analyze(미정, 후에 갱신됨)
   const job = createJob(
     'exam_ocr_analyze',
     { uploadFolderId, sourceType: 'text_pdf' },
     3,
+    userId,
   );
   runExamTextPipeline(job.id, extractedText).catch(err =>
     console.error('[exam text pipeline error]', err),
@@ -40,12 +42,14 @@ export function createPassageAnalyzeJob(
   passageText: string,
   area: string,
   sourceType: string,
+  userId: string = '',
 ): Job {
   const windowCount = splitPassageIntoWindows(passageText).length;
   const job = createJob(
     'passage_analyze',
     { passageText, area, sourceType },
     windowCount,
+    userId,
   );
   runPassagePipeline(job.id, passageText, area, sourceType).catch(err =>
     console.error('[passage pipeline error]', err),
@@ -62,12 +66,14 @@ export function createQuestionGenerateJob(
   passageAnalysisSummary?: string,
   passageCandidatePoints?: string,
   genreAdaptation?: boolean,
+  userId: string = '',
 ): Job {
   const batchCount = Math.ceil(patterns.length / GENERATE_BATCH);
   const job = createJob(
     'question_generate',
     { patterns, passageText, passageTitle, passageArea, passageKeyPoints },
     batchCount,
+    userId,
   );
   runQuestionsPipeline(
     job.id, patterns, passageText, passageTitle, passageArea, passageKeyPoints,

@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { createQuestionGenerateJob } from '@/lib/jobs/driver';
+import { getSessionUser } from '@/lib/session';
 
 export async function POST(request: NextRequest) {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) {
+    return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
+  }
+
   const body = await request.json();
 
   // 배열(pattern_set_ids) 또는 단일(pattern_set_id) 모두 허용
@@ -79,6 +85,7 @@ export async function POST(request: NextRequest) {
     (passage.analysis_summary as string) ?? '',
     '',
     genreAdaptation,
+    sessionUser.id,
   );
 
   return NextResponse.json({ jobId: job.id });

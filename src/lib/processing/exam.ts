@@ -2,19 +2,23 @@ import { runOcrChunk } from '@/lib/ai/ocr';
 import { runSegmentChunk } from '@/lib/ai/segment';
 import { runAnalyzeChunk } from '@/lib/ai/analyze';
 import { updateJob, getAbortSignal } from '@/lib/jobs/store';
+import { mergeModel } from '@/lib/jobs/usage';
 
 function checkAbort(jobId: string) {
   const signal = getAbortSignal(jobId);
   if (signal?.aborted) throw new Error('cancelled');
 }
 
-function addTokens(jobId: string, input: number, output: number) {
+function addTokens(jobId: string, model: string, input: number, output: number) {
   // 누적 토큰을 job에 반영하려면 현재 값을 먼저 읽어야 하므로
   // store에서 getJob을 쓰되, 순환 참조를 피하기 위해 import는 store에서만
   const { getJob } = require('@/lib/jobs/store') as typeof import('@/lib/jobs/store');
   const job = getJob(jobId);
   if (!job) return;
-  updateJob(jobId, { token_usage: job.token_usage + input + output });
+  updateJob(jobId, {
+    token_usage: job.token_usage + input + output,
+    usage_by_model: mergeModel(job.usage_by_model, model, input, output),
+  });
 }
 
 export async function runExamPipeline(jobId: string, localImagePaths: string[]): Promise<void> {
@@ -28,7 +32,7 @@ export async function runExamPipeline(jobId: string, localImagePaths: string[]):
         checkAbort(jobId);
         const result = await runOcrChunk(imgPath);
         ocrTexts[idx] = result.output.text;
-        addTokens(jobId, result.usage.input_tokens, result.usage.output_tokens);
+        addTokens(jobId, result.usage.model, result.usage.input_tokens, result.usage.output_tokens);
         const { getJob } = require('@/lib/jobs/store') as typeof import('@/lib/jobs/store');
         const cur = getJob(jobId);
         updateJob(jobId, { completed_chunks: (cur?.completed_chunks ?? 0) + 1 });
@@ -40,7 +44,7 @@ export async function runExamPipeline(jobId: string, localImagePaths: string[]):
 
     // Phase 2: Segment
     const segResult = await runSegmentChunk(allOcrText);
-    addTokens(jobId, segResult.usage.input_tokens, segResult.usage.output_tokens);
+    addTokens(jobId, segResult.usage.model, segResult.usage.input_tokens, segResult.usage.output_tokens);
     const { getJob } = require('@/lib/jobs/store') as typeof import('@/lib/jobs/store');
     const afterSeg = getJob(jobId);
     const newTotal = (afterSeg?.total_chunks ?? 0) + segResult.groups.length;
@@ -58,7 +62,7 @@ export async function runExamPipeline(jobId: string, localImagePaths: string[]):
         checkAbort(jobId);
         const result = await runAnalyzeChunk(group.text);
         analyzeResults[idx] = result.output;
-        addTokens(jobId, result.usage.input_tokens, result.usage.output_tokens);
+        addTokens(jobId, result.usage.model, result.usage.input_tokens, result.usage.output_tokens);
         const cur2 = getJob(jobId);
         updateJob(jobId, { completed_chunks: (cur2?.completed_chunks ?? 0) + 1 });
       })

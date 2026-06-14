@@ -2,6 +2,7 @@ import { runGenerateChunk } from '@/lib/ai/generate';
 import type { GeneratePattern } from '@/lib/ai/generate';
 import type { PatternBasedQuestion } from '@/types/pattern-remix';
 import { updateJob, getJob, getAbortSignal } from '@/lib/jobs/store';
+import { mergeModel } from '@/lib/jobs/usage';
 
 const BATCH_SIZE = 3;
 
@@ -44,6 +45,7 @@ export async function runQuestionsPipeline(
         updateJob(jobId, {
           completed_chunks: (cur?.completed_chunks ?? 0) + 1,
           token_usage: (cur?.token_usage ?? 0) + result.usage.input_tokens + result.usage.output_tokens,
+          usage_by_model: mergeModel(cur?.usage_by_model, result.usage.model, result.usage.input_tokens, result.usage.output_tokens),
         });
       })
     );

@@ -16,7 +16,7 @@ function isPublic(pathname: string): boolean {
   );
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isPublic(pathname)) return NextResponse.next();
@@ -35,7 +35,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // _next 내부, 정적 파일, 이미지, favicon 은 middleware 자체를 건너뜀
+  // _next 내부, 정적 파일, 이미지, favicon 은 proxy 자체를 건너뜀
   matcher: [
     '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],

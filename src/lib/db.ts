@@ -92,8 +92,22 @@ function initSchema(db: Database.Database) {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
-    CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-    CREATE INDEX IF NOT EXISTS idx_exam_patterns_set ON exam_patterns(pattern_set_id);
+    CREATE TABLE IF NOT EXISTS usage_logs (
+      id            TEXT PRIMARY KEY,
+      user_id       TEXT NOT NULL,
+      job_id        TEXT NOT NULL,
+      job_type      TEXT NOT NULL,
+      model         TEXT NOT NULL,
+      input_tokens  INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(job_id, model)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sessions_user_id   ON sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_usage_logs_user_id ON usage_logs(user_id);
+    CREATE INDEX IF NOT EXISTS idx_usage_logs_created ON usage_logs(created_at);
+    CREATE INDEX IF NOT EXISTS idx_exam_patterns_set  ON exam_patterns(pattern_set_id);
     CREATE INDEX IF NOT EXISTS idx_question_sets_pattern ON question_sets(pattern_set_id);
     CREATE INDEX IF NOT EXISTS idx_question_sets_passage ON question_sets(source_passage_id);
   `);
