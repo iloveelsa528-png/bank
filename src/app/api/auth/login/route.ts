@@ -36,13 +36,17 @@ export async function POST(request: NextRequest) {
 
     const token = createSession(user.id);
 
+    const isHttps =
+      request.headers.get('x-forwarded-proto') === 'https' ||
+      process.env.NODE_ENV === 'production';
+
     const res = NextResponse.json({ ok: true, role: user.role, username: user.username });
     res.cookies.set(SESSION_COOKIE, token, {
       httpOnly:  true,
       sameSite:  'lax',
       path:      '/',
       maxAge:    TTL_SECONDS,
-      secure:    process.env.NODE_ENV === 'production',
+      secure:    isHttps,
     });
     return res;
   } catch {
